@@ -288,8 +288,7 @@ export default function AuthPage({ initialMode = "member" }) {
               isDark ? "text-navy/60" : "text-navy/50"
             }`}
           >
-            Membership is by invitation only. Need help? Contact the group
-            leadership.
+            Need help? Contact the group leadership.
           </p>
         </div>
       </main>

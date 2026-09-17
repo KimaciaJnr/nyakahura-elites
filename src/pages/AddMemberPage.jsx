@@ -59,8 +59,7 @@ function AddMemberView({ onLogout }) {
             New member
           </h2>
           <p className="mt-1 text-sm text-navy/60">
-            Membership is closed — new accounts are created here only. The
-            member can sign in with the email and password you set here.
+            The member can sign in with the email and password you set here.
           </p>
 
           <div className="mt-6">

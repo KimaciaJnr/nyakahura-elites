@@ -22,8 +22,7 @@ export default function GetInvolved() {
             Support our work.
           </h2>
           <p className="mt-6 max-w-md leading-relaxed text-navy/70">
-            Membership is by invitation only, but there is still a place for you
-            — support a program, partner with us, or connect with the people
+            Support a program, partner with us, or connect with the people
             building a stronger Nyakahura.
           </p>
         </div>
