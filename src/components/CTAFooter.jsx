@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 
 export default function CTAFooter() {
@@ -12,23 +13,23 @@ export default function CTAFooter() {
           </span>
         </h2>
         <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-white/75">
-          Be part of the next chapter. Join us, support our work, or simply come
-          home — everyone with roots in Nyakahura is welcome.
+          Support our work, or simply come home — members with roots in
+          Nyakahura can sign in to their portal below.
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
-          <a
-            href="#get-involved"
+          <Link
+            to="/account"
             className="inline-flex items-center gap-2 rounded-full bg-gold px-7 py-3.5 text-sm font-semibold text-navy shadow-lg shadow-gold/30 transition-colors hover:bg-gold-dark"
           >
-            Join Our Community
+            Member Login
             <ArrowRight className="h-4 w-4" />
-          </a>
+          </Link>
           <a
             href="#get-involved"
             className="inline-flex items-center rounded-full border border-white/40 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
           >
-            Send Us a Message
+            Support Our Work
           </a>
         </div>
       </div>

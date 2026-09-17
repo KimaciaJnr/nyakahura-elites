@@ -13,7 +13,7 @@ export default function Hero() {
         <div className="absolute inset-0 bg-navy/70" />
       </div>
 
-      <div className="mx-auto flex min-h-[640px] max-w-7xl flex-col justify-center px-6 py-24 lg:px-10 lg:py-32">
+      <div className="mx-auto flex min-h-[560px] max-w-7xl flex-col justify-center px-6 py-24 sm:min-h-[640px] lg:px-10 lg:py-32">
         <span className="mb-8 inline-flex w-fit items-center rounded-full border border-white/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-white/90">
           A community of young people from Nyakahura, Kenya
         </span>
@@ -25,14 +25,15 @@ export default function Hero() {
         </h1>
 
         <p className="mt-7 max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg">
-          From a few university friends sharing a village shop to a structured
-          community of young professionals — mentoring students, hosting
-          football tournaments, saving together, and building a better Nyakahura.
+          From a few university friends from the same village, to a growing
+          community of young professionals — connected by purpose, supporting
+          one another, mentoring the next generation, creating opportunities,
+          and building a better Nyakahura together.
         </p>
 
         <div className="mt-9 flex flex-wrap items-center gap-4">
           <a
-            href="#join"
+            href="#get-involved"
             className="inline-flex items-center gap-2 rounded-full bg-gold px-7 py-3.5 text-sm font-semibold text-navy shadow-lg shadow-gold/20 transition-colors hover:bg-gold-dark"
           >
             Get Involved

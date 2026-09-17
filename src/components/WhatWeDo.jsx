@@ -2,11 +2,6 @@ import { PiggyBank, GraduationCap, Trophy, HandHeart } from "lucide-react";
 
 const items = [
   {
-    icon: PiggyBank,
-    title: "Saving Together",
-    text: "A chama-style savings initiative backed by working members, building a collective financial foundation for our community activities.",
-  },
-  {
     icon: GraduationCap,
     title: "Mentoring Youth",
     text: "Yearly mentorship programs in local schools — sharing campus experience, career guidance, and life beyond the classroom.",
@@ -20,6 +15,11 @@ const items = [
     icon: HandHeart,
     title: "Giving Back",
     text: "From our famous December 31st gathering to community development — investing in the home that invested in us.",
+  },
+  {
+    icon: PiggyBank,
+    title: "Saving Together",
+    text: "A chama-style savings initiative backed by working members, building a collective financial foundation for our community activities.",
   },
 ];
 

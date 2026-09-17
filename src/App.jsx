@@ -1,27 +1,22 @@
-import Navbar from "./components/Navbar";
-import Hero from "./components/Hero";
-import StorySection from "./components/StorySection";
-import WhatWeDo from "./components/WhatWeDo";
-import ProgramCards from "./components/ProgramCards";
-import ValuesSection from "./components/ValuesSection";
-import GetInvolved from "./components/GetInvolved";
-import CTAFooter from "./components/CTAFooter";
-import Footer from "./components/Footer";
+import { Routes, Route, Navigate } from "react-router-dom";
+import LandingPage from "./pages/LandingPage";
+import AccountPage from "./pages/AccountPage";
+import AdminPage from "./pages/AdminPage";
+import AddMemberPage from "./pages/AddMemberPage";
+import ScrollToTop from "./components/ScrollToTop";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-      <main>
-        <Hero />
-        <StorySection />
-        <WhatWeDo />
-        <ProgramCards />
-        <ValuesSection />
-        <GetInvolved />
-        <CTAFooter />
-      </main>
-      <Footer />
-    </div>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/add-member" element={<AddMemberPage />} />
+        <Route path="" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowRight, Check, ChevronDown } from "lucide-react";
 
 export default function GetInvolved() {
-  const [interest, setInterest] = useState("Joining as a member");
+  const [interest, setInterest] = useState("Supporting a program");
   const [email, setEmail] = useState("");
   const [honeypot, setHoneypot] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -14,15 +14,17 @@ export default function GetInvolved() {
   }
 
   return (
-    <section id="get-involved" className="bg-sand py-20 lg:py-28">
+    <section id="get-involved" className="bg-sand py-20 scroll-mt-24 lg:py-28">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-10">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-gold-dark">Get Involved</p>
           <h2 className="mt-4 font-serif text-4xl font-bold leading-tight text-navy sm:text-5xl">
-            There is a place for you here.
+            Support our work.
           </h2>
           <p className="mt-6 max-w-md leading-relaxed text-navy/70">
-            Join our community, support a program, or connect with the people building a stronger Nyakahura.
+            Membership is by invitation only, but there is still a place for you
+            — support a program, partner with us, or connect with the people
+            building a stronger Nyakahura.
           </p>
         </div>
 
@@ -51,7 +53,6 @@ export default function GetInvolved() {
                 onChange={(e) => setInterest(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-navy/10 bg-white px-4 py-3 pr-10 text-sm text-navy focus:border-navy focus:outline-none focus:ring-2 focus:ring-navy/10"
               >
-                <option>Joining as a member</option>
                 <option>Supporting a program</option>
                 <option>Partnering with Nyakahura Elites</option>
               </select>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
@@ -16,7 +17,7 @@ export default function Navbar() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5 lg:px-10">
         <a href="#" className="flex items-center gap-2">
           <img
-            src="/Photos/logo.png"
+            src="/logo.png"
             alt="Nyakahura Elites"
             className="h-10 w-10 rounded-full object-contain"
           />
@@ -33,12 +34,12 @@ export default function Navbar() {
               {link.label}
             </a>
           ))}
-          <a
-            href="#join"
+          <Link
+            to="/account"
             className="rounded-full bg-navy px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-navy-light"
           >
-            Join Our Community
-          </a>
+            Member Login
+          </Link>
         </div>
 
         <button
@@ -65,12 +66,13 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
-            <a
-              href="#join"
+            <Link
+              to="/account"
+              onClick={() => setOpen(false)}
               className="rounded-full bg-navy px-6 py-2.5 text-center text-sm font-semibold text-white"
             >
-              Join Our Community
-            </a>
+              Member Login
+            </Link>
           </div>
         </div>
       )}
