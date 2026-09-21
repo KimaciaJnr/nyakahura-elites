@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 const navLinks = [
   { label: "Our Story", href: "#story" },
+  { label: "Leadership", href: "#leadership" },
   { label: "Mentorship Programs", href: "#mentorship" },
   { label: "Community Impact", href: "#impact" },
   { label: "Get Involved", href: "#get-involved" },
@@ -19,7 +21,7 @@ export default function Navbar() {
           <img
             src="/logo.png"
             alt="Nyakahura Elites"
-            className="h-10 w-10 rounded-full object-contain"
+            className="h-10 w-10 rounded-full object-cover ring-1 ring-navy/10"
           />
           <span className="font-serif text-lg font-bold text-navy">Nyakahura Elites</span>
         </a>
@@ -40,17 +42,21 @@ export default function Navbar() {
           >
             Member Login
           </Link>
+          <ThemeToggle className="text-navy hover:bg-navy/10" />
         </div>
 
-        <button
-          className="lg:hidden"
-          onClick={() => setOpen(!open)}
-          aria-label="Toggle menu"
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-        >
-          {open ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <ThemeToggle className="text-navy hover:bg-navy/10" />
+          <button
+            className="lg:hidden"
+            onClick={() => setOpen(!open)}
+            aria-label="Toggle menu"
+            aria-expanded={open}
+            aria-controls="mobile-menu"
+          >
+            {open ? <X /> : <Menu />}
+          </button>
+        </div>
       </nav>
 
       {open && (

@@ -14,5 +14,13 @@ export default function AccountPage() {
     return <Navigate to="/admin" replace />;
   }
 
+  if (session.role === "treasurer") {
+    return <Navigate to="/treasurer" replace />;
+  }
+
+  if (session.role === "secretary") {
+    return <Navigate to="/secretary" replace />;
+  }
+
   return <AccountDashboard session={session} onLogout={logout} />;
 }

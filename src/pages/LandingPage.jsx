@@ -1,6 +1,7 @@
 import Navbar from "../components/Navbar";
 import Hero from "../components/Hero";
 import StorySection from "../components/StorySection";
+import LeadershipSection from "../components/LeadershipSection";
 import WhatWeDo from "../components/WhatWeDo";
 import ProgramCards from "../components/ProgramCards";
 import ValuesSection from "../components/ValuesSection";
@@ -15,6 +16,7 @@ export default function LandingPage() {
       <main>
         <Hero />
         <StorySection />
+        <LeadershipSection />
         <WhatWeDo />
         <ProgramCards />
         <ValuesSection />

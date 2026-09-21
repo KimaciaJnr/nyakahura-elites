@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import SettingsPanel from "./SettingsPanel";
 import {
   Shield,
   Users,
   Search,
-  RotateCcw,
   UserPlus,
   Pencil,
   Trash2,
@@ -15,11 +15,13 @@ import {
   ChevronUp,
   Check,
   KeyRound,
+  Snowflake,
 } from "lucide-react";
 import {
   getMembers,
   getAccounts,
   getFees,
+  getUnpaidTotals,
   updateMember,
   deleteMember,
   recordContribution,
@@ -28,6 +30,8 @@ import {
   KES,
 } from "../../lib/store";
 import BackToLogin from "../BackToLogin";
+import ThemeToggle from "../ThemeToggle";
+import RoleMandate from "../RoleMandate";
 
 function MemberRow({ member, onChanged }) {
   const [open, setOpen] = useState(false);
@@ -36,13 +40,13 @@ function MemberRow({ member, onChanged }) {
     name: member.name,
     email: member.email,
     occupation: member.occupation || "",
-    contribution: "2000",
+    contribution: "500",
   });
   const [newPass, setNewPass] = useState("");
   const [contributionDate, setContributionDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
-  const [contributionAmount, setContributionAmount] = useState("2000");
+  const [contributionAmount, setContributionAmount] = useState("500");
   const [message, setMessage] = useState("");
 
   const account = getAccounts().find((a) => a.memberId === member.id);
@@ -78,7 +82,7 @@ function MemberRow({ member, onChanged }) {
     try {
       recordContribution(member.id, contributionDate, contributionAmount);
       setMessage(`Contribution of ${KES(contributionAmount)} recorded.`);
-      setContributionAmount("2000");
+      setContributionAmount("500");
       onChanged();
     } catch (err) {
       setMessage(err.message);
@@ -89,6 +93,23 @@ function MemberRow({ member, onChanged }) {
     settleFee(feeId);
     setMessage("Fee marked as paid.");
     onChanged();
+  }
+
+  function handleToggleStatus() {
+    const frozen = member.status === "frozen";
+    if (
+      window.confirm(
+        frozen
+          ? `Reactivate ${member.name}? They will rejoin the active roster for contributions.`
+          : `Freeze ${member.name}? This keeps their balances and history but removes them from the monthly contribution register.`,
+      )
+    ) {
+      updateMember(member.id, { status: frozen ? "active" : "frozen" });
+      setMessage(
+        frozen ? "Member reactivated." : "Member frozen — retained on record.",
+      );
+      onChanged();
+    }
   }
 
   return (
@@ -106,6 +127,12 @@ function MemberRow({ member, onChanged }) {
             <div>
               <p className="text-sm font-semibold text-navy">{member.name}</p>
               <p className="text-xs text-navy/50">{member.memberNo}</p>
+              {member.status === "frozen" && (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">
+                  <Snowflake className="h-3 w-3" />
+                  Frozen
+                </span>
+              )}
             </div>
           </div>
         </td>
@@ -220,7 +247,7 @@ function MemberRow({ member, onChanged }) {
               ) : (
                 <button
                   onClick={() => {
-                    setForm({ ...form, contribution: String(account?.monthlyContribution ?? "2000") });
+                    setForm({ ...form, contribution: String(account?.monthlyContribution ?? "500") });
                     setEditing(true);
                   }}
                   className="mt-3 rounded-full bg-white px-4 py-2 text-xs font-semibold text-navy ring-1 ring-navy/10 transition-colors hover:bg-navy/5"
@@ -319,7 +346,22 @@ function MemberRow({ member, onChanged }) {
             </section>
           </div>
 
-          <div className="flex justify-end border-t border-navy/10 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-navy/10 pt-4">
+            <button
+              onClick={handleToggleStatus}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold ring-1 transition-colors ${
+                member.status === "frozen"
+                  ? "bg-green/10 text-green ring-green/20 hover:bg-green/20"
+                  : "bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100"
+              }`}
+            >
+              {member.status === "frozen" ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <Snowflake className="h-3.5 w-3.5" />
+              )}
+              {member.status === "frozen" ? "Reactivate" : "Freeze (remove from register)"}
+            </button>
             <button
               onClick={handleDelete}
               className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 ring-1 ring-red-200 transition-colors hover:bg-red-100"
@@ -343,11 +385,13 @@ export default function AdminConsole({ onLogout }) {
   const members = getMembers().filter((m) => m.role === "member");
   const accounts = getAccounts();
   const membersById = Object.fromEntries(members.map((m) => [m.id, m]));
+  const activeCount = members.filter((m) => m.status !== "frozen").length;
+  const frozenCount = members.length - activeCount;
   const totalSavings = accounts.reduce(
     (sum, a) => sum + (membersById[a.memberId] ? a.balance : 0),
     0,
   );
-  const totalUnpaid = getFees().reduce((sum, f) => sum + f.amount, 0);
+  const totalUnpaid = getUnpaidTotals().amount;
 
   const q = query.trim().toLowerCase();
   const filteredMembers = q
@@ -385,6 +429,7 @@ export default function AdminConsole({ onLogout }) {
               </div>
             </div>
           </div>
+          <ThemeToggle className="text-white hover:bg-white/10" />
           <button
             onClick={onLogout}
             className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20"
@@ -395,11 +440,16 @@ export default function AdminConsole({ onLogout }) {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <RoleMandate roleKey="admin" />
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
-            <p className="text-sm text-white/60">Members</p>
+            <p className="text-sm text-white/60">Active members</p>
             <p className="mt-2 font-serif text-3xl font-bold text-white">
-              {members.length}
+              {activeCount}
+            </p>
+            <p className="mt-1 text-xs text-white/50">
+              {frozenCount} frozen · kept on record
             </p>
           </div>
           <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
@@ -436,16 +486,6 @@ export default function AdminConsole({ onLogout }) {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => {
-                    resetDemo();
-                    setRefresh((n) => n + 1);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-navy/5 px-4 py-2 text-xs font-semibold text-navy transition-colors hover:bg-navy/10"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reset demo data
-                </button>
                 <Link
                   to="/admin/add-member"
                   className="inline-flex items-center gap-1.5 rounded-full bg-green px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-dark"
@@ -496,6 +536,10 @@ export default function AdminConsole({ onLogout }) {
               )}
             </div>
           </section>
+        </div>
+
+        <div className="mt-8">
+          <SettingsPanel onChanged={() => setRefresh((n) => n + 1)} />
         </div>
       </main>
     </div>

@@ -11,3 +11,57 @@ body {
   color: #102A43;
   @apply bg-sand;
 }
+
+/* ---------- Dark mode ---------- */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #0B101E;
+  color: #DCE3F0;
+}
+
+.dark ::selection {
+  background-color: rgba(47, 125, 74, 0.45);
+}
+
+/* Surfaces */
+.dark .bg-sand { background-color: #0B101E; }
+.dark .bg-white { background-color: #161F33; }
+.dark .bg-cream { background-color: #141A2B; }
+.dark .bg-white\/95 { background-color: rgba(22, 31, 51, 0.95); }
+.dark .bg-white\/70 { background-color: rgba(22, 31, 51, 0.7); }
+.dark .bg-white\/60 { background-color: rgba(22, 31, 51, 0.6); }
+.dark .bg-sand\/60 { background-color: rgba(255, 255, 255, 0.05); }
+.dark .bg-sand\/70 { background-color: rgba(255, 255, 255, 0.07); }
+.dark .bg-navy\/5 { background-color: rgba(226, 232, 240, 0.06); }
+.dark .bg-navy\/10 { background-color: rgba(226, 232, 240, 0.1); }
+.dark .bg-navy\/20 { background-color: rgba(226, 232, 240, 0.14); }
+
+/* Ink text */
+.dark .text-navy { color: #E4EAF3; }
+.dark .text-navy\/40 { color: rgba(228, 234, 243, 0.4); }
+.dark .text-navy\/45 { color: rgba(228, 234, 243, 0.45); }
+.dark .text-navy\/50 { color: rgba(228, 234, 243, 0.5); }
+.dark .text-navy\/60 { color: rgba(228, 234, 243, 0.6); }
+.dark .text-navy\/70 { color: rgba(228, 234, 243, 0.7); }
+.dark .text-navy\/75 { color: rgba(228, 234, 243, 0.75); }
+.dark .text-navy\/80 { color: rgba(228, 234, 243, 0.8); }
+.dark .text-gold-dark { color: #E5BE4E; }
+.dark .text-green-dark { color: #5CB87E; }
+.dark .placeholder\:text-navy\/40::placeholder { color: rgba(228, 234, 243, 0.4); }
+
+/* Hairlines */
+.dark .border-navy\/5 { border-color: rgba(228, 234, 243, 0.08); }
+.dark .border-navy\/10 { border-color: rgba(228, 234, 243, 0.12); }
+.dark .border-navy\/20 { border-color: rgba(228, 234, 243, 0.2); }
+.dark .border-black\/5 { border-color: rgba(228, 234, 243, 0.08); }
+.dark .divide-navy\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(228, 234, 243, 0.08); }
+.dark .ring-navy\/5 { --tw-ring-color: rgba(228, 234, 243, 0.08); }
+.dark .ring-navy\/10 { --tw-ring-color: rgba(228, 234, 243, 0.12); }
+.dark .ring-black\/5 { --tw-ring-color: rgba(228, 234, 243, 0.08); }
+
+/* Soften card shadows in dark mode */
+.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.dark .shadow-xl { box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.6); }

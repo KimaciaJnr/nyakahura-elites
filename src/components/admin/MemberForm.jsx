@@ -7,7 +7,7 @@ export default function MemberForm({ onAdded }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [occupation, setOccupation] = useState("");
-  const [contribution, setContribution] = useState("2000");
+  const [contribution, setContribution] = useState("500");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -28,7 +28,7 @@ export default function MemberForm({ onAdded }) {
       setEmail("");
       setPassword("");
       setOccupation("");
-      setContribution("2000");
+      setContribution("500");
       onAdded(member);
     } catch (err) {
       setError(err.message);

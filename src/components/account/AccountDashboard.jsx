@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Wallet,
@@ -9,15 +10,42 @@ import {
   Briefcase,
   HandHeart,
   ArrowRight,
+  User,
+  Mail,
+  BadgeCheck,
+  CalendarDays,
+  Phone,
+  Pencil,
+  Save,
+  Check,
+  Info,
+  Lock,
+  Printer,
+  Megaphone,
+  FileText,
+  CalendarClock,
+  X,
+  Clock,
+  MapPin,
 } from "lucide-react";
 import BackLink from "../BackLink";
 import BackToLogin from "../BackToLogin";
+import ThemeToggle from "../ThemeToggle";
+import MemberStatement from "../treasurer/MemberStatement";
 import {
   getMember,
   getAccount,
   getHistory,
   getFees,
   getInvestments,
+  getMemberYearlySavings,
+  getMemberSavings,
+  updateMember,
+  getNextMeeting,
+  getAnnouncements,
+  getMinutes,
+  getContributionForMonth,
+  getPoolStats,
   KES,
 } from "../../lib/store";
 
@@ -28,15 +56,31 @@ const CATEGORY_ICONS = {
 };
 
 export default function AccountDashboard({ session, onLogout }) {
+  const [refresh, setRefresh] = useState(0);
+  const [statementOpen, setStatementOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [profileMsg, setProfileMsg] = useState("");
+  const [openMinuteId, setOpenMinuteId] = useState(null);
+
   const member = getMember(session.memberId);
   const account = getAccount(session.memberId);
   const history = getHistory(session.memberId).slice(0, 12);
   const fees = getFees(session.memberId);
   const investments = getInvestments();
+  const nextMeeting = getNextMeeting();
+  const announcements = getAnnouncements().filter((a) => a.published);
+  const approvedMinutes = getMinutes().filter((m) => m.status === "approved");
+  const contributionNow = getContributionForMonth("2026-09");
+  const contributionNext = getContributionForMonth("2027-01");
 
   const feeTotal = fees.reduce((sum, fee) => sum + fee.amount, 0);
   const totalInvested = investments.reduce((sum, inv) => sum + inv.amount, 0);
   const totalValue = investments.reduce((sum, inv) => sum + inv.currentValue, 0);
+  const yearly = getMemberYearlySavings(session.memberId);
+  const record = getMemberSavings(session.memberId);
+  const pool = getPoolStats();
 
   if (!account) {
     return (
@@ -83,7 +127,7 @@ export default function AccountDashboard({ session, onLogout }) {
               <img
                 src="/logo.png"
                 alt="Nyakahura Elites"
-                className="h-10 w-10 rounded-full object-contain"
+                className="h-10 w-10 rounded-full object-cover ring-1 ring-navy/10"
               />
               <span className="font-serif text-lg font-bold text-navy">
                 Nyakahura Elites
@@ -96,6 +140,7 @@ export default function AccountDashboard({ session, onLogout }) {
               <p className="text-sm font-semibold text-navy">{member.name}</p>
               <p className="text-xs text-navy/50">{member.memberNo}</p>
             </div>
+            <ThemeToggle className="text-navy hover:bg-navy/10" />
             <button
               onClick={onLogout}
               className="inline-flex items-center gap-2 rounded-full bg-navy/5 px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-navy/10"
@@ -127,6 +172,18 @@ export default function AccountDashboard({ session, onLogout }) {
           )}
         </div>
 
+        {member.status === "frozen" && (
+          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            <Info className="h-5 w-5 shrink-0 text-amber-600" />
+            <p>
+              Your membership is currently <strong>frozen</strong> following
+              arrears above a full year of contributions. Your savings balance
+              and history are retained — no further monthly contributions are
+              expected. To be reactivated, speak to the elected executive.
+            </p>
+          </div>
+        )}
+
         <div className="mt-8 grid gap-5 sm:grid-cols-3">
           <div className="rounded-3xl bg-navy p-7 text-white shadow-lg shadow-navy/10">
             <div className="flex items-center gap-3">
@@ -141,7 +198,9 @@ export default function AccountDashboard({ session, onLogout }) {
               {KES(account.balance)}
             </p>
             <p className="mt-1 text-xs text-white/60">
-              Monthly contribution: {KES(account.monthlyContribution)}
+              {member.status === "frozen"
+                ? "Membership frozen — no monthly contribution required"
+                : `Monthly contribution: ${KES(contributionNow)} · growing to ${KES(contributionNext)} from Jan 2027 · as per savings record (09/06/2026)`}
             </p>
           </div>
 
@@ -176,6 +235,243 @@ export default function AccountDashboard({ session, onLogout }) {
               {fees.length > 0 ? "Due — please settle soon" : "All settled, asante"}
             </p>
           </div>
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-navy/5 sm:p-8">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-navy/5 text-navy">
+                  <User className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-serif text-xl font-bold text-navy">
+                    Your details
+                  </h2>
+                  <p className="text-xs text-navy/50">
+                    As listed in the group's savings record
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (editingProfile) return;
+                  setPhone(member.phone || "");
+                  setOccupation(member.occupation || "");
+                  setEditingProfile(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full bg-navy/5 px-4 py-2 text-xs font-semibold text-navy transition-colors hover:bg-navy/10"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                {editingProfile ? "Editing…" : "Edit"}
+              </button>
+            </div>
+
+            {editingProfile ? (
+              <div className="mt-6 space-y-4 rounded-2xl bg-sand p-5">
+                <label className="block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-navy/50">Phone number</span>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. 0712 345 678"
+                    className="mt-1.5 w-full rounded-xl border border-navy/10 bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-navy/50">Occupation</span>
+                  <input
+                    value={occupation}
+                    onChange={(e) => setOccupation(e.target.value)}
+                    placeholder="e.g. Teacher"
+                    className="mt-1.5 w-full rounded-xl border border-navy/10 bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => {
+                      updateMember(session.memberId, {
+                        phone: phone.trim(),
+                        occupation: occupation.trim(),
+                      });
+                      setEditingProfile(false);
+                      setProfileMsg("Details updated.");
+                      setRefresh((n) => n + 1);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full bg-green px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-dark"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save details
+                  </button>
+                  <button
+                    onClick={() => setEditingProfile(false)}
+                    className="rounded-full bg-navy/5 px-5 py-2.5 text-sm font-semibold text-navy hover:bg-navy/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {profileMsg && (
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-green">
+                    <Check className="h-3.5 w-3.5" />
+                    {profileMsg}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <dl className="mt-6 space-y-4">
+                <div className="flex items-start justify-between gap-4 border-b border-navy/5 pb-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <BadgeCheck className="h-4 w-4 text-green" />
+                    Full name
+                  </dt>
+                  <dd className="text-right text-sm font-semibold text-navy">
+                    {member.name}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-4 border-b border-navy/5 pb-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <User className="h-4 w-4 text-green" />
+                    Member number
+                  </dt>
+                  <dd className="text-right text-sm font-semibold text-navy">
+                    {member.memberNo}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-4 border-b border-navy/5 pb-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <Mail className="h-4 w-4 text-green" />
+                    Email
+                  </dt>
+                  <dd className="text-right text-sm font-medium text-navy">
+                    {member.email}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-4 border-b border-navy/5 pb-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <Phone className="h-4 w-4 text-green" />
+                    Phone
+                  </dt>
+                  <dd className="text-right text-sm font-medium text-navy">
+                    {member.phone || "—"}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-4 border-b border-navy/5 pb-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <Briefcase className="h-4 w-4 text-green" />
+                    Occupation
+                  </dt>
+                  <dd className="text-right text-sm font-medium text-navy">
+                    {member.occupation || "—"}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-4 border-b border-navy/5 pb-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <CalendarDays className="h-4 w-4 text-green" />
+                    Member since
+                  </dt>
+                  <dd className="text-right text-sm font-medium text-navy">
+                    {account.memberSince}
+                  </dd>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <dt className="flex items-center gap-2 text-sm text-navy/60">
+                    <Wallet className="h-4 w-4 text-green" />
+                    Monthly contribution
+                  </dt>
+                  <dd className="text-right text-sm font-medium text-navy">
+                    {KES(contributionNow)}{" "}
+                    <span className="text-xs text-navy/40">
+                      (→ {KES(contributionNext)} from Jan 2027)
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            )}
+          </section>
+
+          <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-navy/5 sm:p-8">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-serif text-xl font-bold text-navy">
+                  Your savings record
+                </h2>
+                <p className="text-xs text-navy/50">
+                  Annual totals, matching the group's savings record
+                </p>
+              </div>
+            </div>
+
+            <table className="mt-6 w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-navy/10 text-[11px] uppercase tracking-wide text-navy/50">
+                  <th className="py-2 pr-3 text-left font-semibold">Year</th>
+                  <th className="py-2 text-right font-semibold">Amount saved</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yearly.map((y) => (
+                  <tr key={y.year} className="border-b border-navy/5">
+                    <td className="py-3 pr-3 font-semibold text-navy">{y.year}</td>
+                    <td
+                      className={`py-3 text-right font-serif font-bold ${
+                        y.total < 0 ? "text-red-500" : "text-green"
+                      }`}
+                    >
+                      {KES(y.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {yearly.length === 0 && (
+              <p className="mt-6 rounded-2xl bg-sand px-5 py-6 text-center text-sm text-navy/50">
+                No savings recorded yet for this account.
+              </p>
+            )}
+
+            <div className="mt-6 rounded-2xl bg-sand p-5 ring-1 ring-navy/5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-navy">
+                  Savings record status
+                </p>
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${
+                    record
+                      ? record.arrears > 0
+                        ? "bg-red-100 text-red-600"
+                        : record.arrears < 0
+                          ? "bg-green/10 text-green"
+                          : "bg-navy/5 text-navy/70"
+                      : "bg-navy/5 text-navy/70"
+                  }`}
+                >
+                  {record
+                    ? record.arrears > 0
+                      ? `Arrears ${KES(record.arrears)}`
+                      : record.arrears < 0
+                        ? `Ahead ${KES(-record.arrears)}`
+                        : "Up to date"
+                    : "No record yet"}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-navy/60">
+                Grand total savings:{" "}
+                <span className="font-bold text-green">{KES(account.balance)}</span>{" "}
+                · Monthly contribution is {KES(500)} and savings grow gradually
+                each month. Arrears clear once contributions are up to date.
+              </p>
+              <button
+                onClick={() => setStatementOpen(true)}
+                className="mt-4 inline-flex items-center gap-2 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light"
+              >
+                <Printer className="h-4 w-4" />
+                View statement (print / PDF)
+              </button>
+            </div>
+          </section>
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
@@ -334,6 +630,177 @@ export default function AccountDashboard({ session, onLogout }) {
           </div>
         </section>
 
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-navy/5 sm:p-8">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-green/10 text-green">
+                <Landmark className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-serif text-xl font-bold text-navy">
+                  Group savings account
+                </h2>
+                <p className="text-xs text-navy/50">
+                  All contributions are pooled in the joint group account
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl bg-sand p-5 sm:p-6">
+              <p className="text-sm text-navy/60">
+                Your savings sit together with everyone's in the group's KCB
+                account and investments — nobody withdraws directly from their
+                own balance.
+              </p>
+              <dl className="mt-5 grid grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-navy/50">
+                    Total savings pool
+                  </dt>
+                  <dd className="mt-1 font-serif text-2xl font-bold text-navy">
+                    {KES(pool.savingsPool)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-navy/50">
+                    Invested
+                  </dt>
+                  <dd className="mt-1 font-serif text-2xl font-bold text-navy">
+                    {KES(pool.invested)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="mt-5 flex items-start gap-2.5 rounded-2xl bg-navy/5 px-4 py-3 text-xs leading-relaxed text-navy/70">
+              <Lock className="h-4 w-4 shrink-0 text-navy" />
+              <p>
+                Only the elected executive can authorise a transfer or payout
+                from the group account — as a member you don't withdraw
+                directly. Contact the treasurer if you need a payout.
+              </p>
+            </div>
+          </section>
+
+          <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-navy/5 sm:p-8">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
+                <CalendarClock className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-serif text-xl font-bold text-navy">
+                  Upcoming meeting
+                </h2>
+                <p className="text-xs text-navy/50">
+                  The group meets every 2nd Tuesday of the month
+                </p>
+              </div>
+            </div>
+
+            {nextMeeting ? (
+              <div className="mt-5 rounded-2xl bg-navy p-6 text-white">
+                <p className="font-serif text-2xl font-bold">{nextMeeting.title}</p>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/70">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays className="h-4 w-4 text-gold" />
+                    {new Date(nextMeeting.date + "T00:00:00").toLocaleDateString("en-GB", {
+                      weekday: "long",
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-gold" />
+                    {nextMeeting.time}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4 text-gold" />
+                    {nextMeeting.venue}
+                  </span>
+                </div>
+                <p className="mt-4 text-xs font-bold uppercase tracking-wider text-gold">
+                  Agenda
+                </p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-white/80">
+                  {nextMeeting.agenda.slice(0, 5).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : (
+              <p className="mt-5 rounded-2xl bg-sand px-5 py-6 text-center text-sm text-navy/50">
+                No upcoming meeting scheduled.
+              </p>
+            )}
+
+            <div className="mt-6 border-t border-navy/10 pt-5">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-navy/50">
+                <Megaphone className="h-4 w-4 text-gold-dark" />
+                Announcements
+              </p>
+              <ul className="mt-3 space-y-3">
+                {announcements.slice(0, 4).map((a) => (
+                  <li key={a.id} className="rounded-2xl bg-sand px-4 py-3">
+                    <p className="text-sm font-semibold text-navy">{a.title}</p>
+                    {a.body && (
+                      <p className="mt-0.5 text-xs leading-relaxed text-navy/60">{a.body}</p>
+                    )}
+                    <p className="mt-1 text-[11px] text-navy/40">{a.date}</p>
+                  </li>
+                ))}
+                {announcements.length === 0 && (
+                  <li className="text-sm text-navy/40">No announcements yet.</li>
+                )}
+              </ul>
+            </div>
+
+            <div className="mt-6 border-t border-navy/10 pt-5">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-navy/50">
+                <FileText className="h-4 w-4 text-gold-dark" />
+                Latest approved minutes
+              </p>
+              <ul className="mt-3 space-y-2">
+                {approvedMinutes.slice(0, 3).map((m) => (
+                  <li key={m.id} className="rounded-2xl bg-sand px-4 py-3">
+                    <button
+                      onClick={() => setOpenMinuteId(openMinuteId === m.id ? null : m.id)}
+                      className="flex w-full items-center justify-between gap-2 text-left"
+                    >
+                      <span className="text-sm font-semibold text-navy">{m.title}</span>
+                      <span className="text-xs text-navy/40">
+                        {m.resolutions.length} resolution{m.resolutions.length === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                    {openMinuteId === m.id && (
+                      <div className="mt-3 space-y-3 border-t border-navy/10 pt-3">
+                        <p className="text-xs text-navy/60">
+                          {new Date(m.meetingDate + "T00:00:00").toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "long",
+                            year: "numeric",
+                          })}{" "}
+                          · {m.venue}
+                        </p>
+                        {m.resolutions.map((r) => (
+                          <div key={r.ref || r.title}>
+                            <p className="text-xs font-bold text-gold-dark">{r.ref}</p>
+                            <p className="text-sm font-semibold text-navy">{r.title}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-navy/70">{r.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+                {approvedMinutes.length === 0 && (
+                  <li className="text-sm text-navy/40">No approved minutes yet.</li>
+                )}
+              </ul>
+            </div>
+          </section>
+        </div>
+
         <p className="mt-8 text-center text-xs text-navy/50">
           Need a change or a question about your account? Reach the group
           leadership through the contact section on the main site.
@@ -345,6 +812,13 @@ export default function AccountDashboard({ session, onLogout }) {
           </Link>
         </p>
       </main>
+
+      {statementOpen && (
+        <MemberStatement
+          memberId={session.memberId}
+          onClose={() => setStatementOpen(false)}
+        />
+      )}
     </div>
   );
 }
