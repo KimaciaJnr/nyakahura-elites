@@ -3,6 +3,16 @@ import { useAuth } from "../auth/AuthContext";
 import AuthPage from "./AuthPage";
 import TreasurerConsole from "../components/treasurer/TreasurerConsole";
 
+const ROLE_HOME = {
+  member: "/account",
+  admin: "/admin",
+  treasurer: "/treasurer",
+  secretary: "/secretary",
+  chairperson: "/chairperson",
+  vicechairperson: "/vice-chair",
+  organising: "/organising",
+};
+
 export default function TreasurerPage() {
   const { session, logout } = useAuth();
 
@@ -10,14 +20,8 @@ export default function TreasurerPage() {
     return <AuthPage initialMode="treasurer" />;
   }
 
-  if (session.role === "admin") {
-    return <Navigate to="/admin" replace />;
-  }
-  if (session.role === "member") {
-    return <Navigate to="/account" replace />;
-  }
-  if (session.role === "secretary") {
-    return <Navigate to="/secretary" replace />;
+  if (session.role in ROLE_HOME && session.role !== "treasurer") {
+    return <Navigate to={ROLE_HOME[session.role]} replace />;
   }
 
   return <TreasurerConsole session={session} onLogout={logout} />;

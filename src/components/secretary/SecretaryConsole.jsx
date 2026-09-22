@@ -14,6 +14,7 @@ import {
   ListChecks,
   Megaphone,
   BookUser,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   getMinutes,
@@ -54,12 +55,13 @@ function fmtDate(d) {
 export default function SecretaryConsole({ session, onLogout }) {
   const [refresh, setRefresh] = useState(0);
   const [view, setView] = useState({ name: "list" });
-  const [tab, setTab] = useState("minutes");
+  const [tab, setTab] = useState("overview");
   const minutes = getMinutes();
 
   const approvedCount = minutes.filter((m) => m.status === "approved").length;
 
   const tabs = [
+    { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "minutes", label: "Minutes", icon: ClipboardList },
     { key: "meetings", label: "Meetings & agenda", icon: CalendarCheck2 },
     { key: "actions", label: "Action items", icon: ListChecks },
@@ -127,10 +129,28 @@ export default function SecretaryConsole({ session, onLogout }) {
       </div>
 
       <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
-        <RoleMandate
-          roleKey="secretary"
-          holder={session.relatedMemberId ? getMember(session.relatedMemberId) : null}
-        />
+        {tab === "overview" && (
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
+                <p className="text-sm text-white/60">Meetings recorded</p>
+                <p className="mt-2 font-serif text-3xl font-bold text-white">{minutes.length}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
+                <p className="text-sm text-white/60">Approved minutes</p>
+                <p className="mt-2 font-serif text-3xl font-bold text-gold">{approvedCount}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
+                <p className="text-sm text-white/60">Draft minutes</p>
+                <p className="mt-2 font-serif text-3xl font-bold text-white">{minutes.length - approvedCount}</p>
+              </div>
+            </div>
+            <RoleMandate
+              roleKey="secretary"
+              holder={session.relatedMemberId ? getMember(session.relatedMemberId) : null}
+            />
+          </div>
+        )}
         {tab === "meetings" && <MeetingsTab onChanged={() => setRefresh((n) => n + 1)} />}
         {tab === "actions" && <ActionItemsTab onChanged={() => setRefresh((n) => n + 1)} />}
         {tab === "announcements" && (

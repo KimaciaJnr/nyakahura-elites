@@ -440,8 +440,6 @@ export default function AdminConsole({ onLogout }) {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
-        <RoleMandate roleKey="admin" />
-
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
             <p className="text-sm text-white/60">Active members</p>
@@ -540,6 +538,9 @@ export default function AdminConsole({ onLogout }) {
 
         <div className="mt-8">
           <SettingsPanel onChanged={() => setRefresh((n) => n + 1)} />
+        </div>
+        <div className="mt-10">
+          <RoleMandate roleKey="admin" />
         </div>
       </main>
     </div>

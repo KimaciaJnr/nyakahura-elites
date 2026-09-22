@@ -16,6 +16,7 @@ import {
   getPoolStats,
   getCashPosition,
   getMeetings,
+  getNextMeeting,
   getMinutes,
   updateMinutes,
 } from "../../lib/store";
@@ -94,10 +95,6 @@ export default function ChairpersonConsole({ session, onLogout }) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-6 pt-10 lg:px-10">
-        <RoleMandate roleKey="chairperson" holder={holder} />
-      </div>
-
       <nav className="mx-auto mt-8 max-w-7xl px-6 lg:px-10">
         <div className="flex flex-wrap gap-2">
           {TABS.map((t) => {
@@ -173,6 +170,9 @@ export default function ChairpersonConsole({ session, onLogout }) {
                 No upcoming meetings scheduled.
               </section>
             )}
+            <div className="pt-4">
+              <RoleMandate roleKey="chairperson" holder={holder} />
+            </div>
           </div>
         )}
 

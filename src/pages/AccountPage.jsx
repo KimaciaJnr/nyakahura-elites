@@ -3,6 +3,16 @@ import { useAuth } from "../auth/AuthContext";
 import AuthPage from "./AuthPage";
 import AccountDashboard from "../components/account/AccountDashboard";
 
+const ROLE_HOME = {
+  member: "/account",
+  admin: "/admin",
+  treasurer: "/treasurer",
+  secretary: "/secretary",
+  chairperson: "/chairperson",
+  vicechairperson: "/vice-chair",
+  organising: "/organising",
+};
+
 export default function AccountPage() {
   const { session, logout } = useAuth();
 
@@ -10,16 +20,8 @@ export default function AccountPage() {
     return <AuthPage initialMode="member" />;
   }
 
-  if (session.role === "admin") {
-    return <Navigate to="/admin" replace />;
-  }
-
-  if (session.role === "treasurer") {
-    return <Navigate to="/treasurer" replace />;
-  }
-
-  if (session.role === "secretary") {
-    return <Navigate to="/secretary" replace />;
+  if (session.role in ROLE_HOME && session.role !== "member") {
+    return <Navigate to={ROLE_HOME[session.role]} replace />;
   }
 
   return <AccountDashboard session={session} onLogout={logout} />;

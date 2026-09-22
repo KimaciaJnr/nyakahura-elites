@@ -94,6 +94,16 @@ function AddMemberView({ onLogout }) {
   );
 }
 
+const ROLE_HOME = {
+  member: "/account",
+  admin: "/admin",
+  treasurer: "/treasurer",
+  secretary: "/secretary",
+  chairperson: "/chairperson",
+  vicechairperson: "/vice-chair",
+  organising: "/organising",
+};
+
 export default function AddMemberPage() {
   const { session, logout } = useAuth();
 
@@ -101,8 +111,8 @@ export default function AddMemberPage() {
     return <AuthPage initialMode="admin" />;
   }
 
-  if (session.role === "member") {
-    return <Navigate to="/account" replace />;
+  if (session.role in ROLE_HOME && session.role !== "admin") {
+    return <Navigate to={ROLE_HOME[session.role]} replace />;
   }
 
   return <AddMemberView onLogout={logout} />;

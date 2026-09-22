@@ -13,6 +13,7 @@ import {
   SEED_MMF,
   SEED_ANNOUNCEMENTS,
   SEED_ACTION_ITEMS,
+  MEMBER_CONTACTS_BY_NO,
 } from "../data/seed";
 
 const KEYS = {
@@ -31,6 +32,7 @@ const KEYS = {
   fines: "neh_fines",
   loans: "neh_loans",
   withdrawals: "neh_withdrawals",
+  transactions: "neh_official_transactions",
   banks: "neh_banks",
   mmf: "neh_mmf",
   announcements: "neh_announcements",
@@ -40,7 +42,8 @@ const KEYS = {
   events: "neh_events",
 };
 
-const SEED_VERSION = "2026-09-roles-600";
+const SEED_VERSION = "2026-09-officer-portals-700";
+const CONTRIBUTION_RECORD_VERSION = "2026-09-uploaded-record-2";
 
 function read(key, fallback) {
   try {
@@ -85,11 +88,36 @@ function seed() {
 function initStore() {
   const existingVersion = localStorage.getItem(KEYS.seedVersion);
   if (existingVersion !== SEED_VERSION) {
-    localStorage.removeItem(KEYS.session);
     seed();
     write(KEYS.seedVersion, SEED_VERSION);
   } else if (!localStorage.getItem(KEYS.members)) {
     seed();
+  }
+
+  // Apply authoritative contact updates to existing browser data without
+  // resetting locally recorded transactions, approvals, or documents.
+  const members = read(KEYS.members, []);
+  const updated = members.map((member) => {
+    const contact = MEMBER_CONTACTS_BY_NO[member.memberNo];
+    return contact
+      ? { ...member, name: contact.name, phone: contact.phone, email: contact.email || member.email }
+      : member;
+  });
+  write(KEYS.members, updated);
+
+  if (localStorage.getItem("neh_contribution_record_version") !== CONTRIBUTION_RECORD_VERSION) {
+    const canonical = buildSeed();
+    const recorded2026 = canonical.history.filter(
+      (entry) => entry.date.startsWith("2026-") && entry.type === "contribution",
+    );
+    const existingHistory = read(KEYS.history, []).filter(
+      (entry) =>
+        !(entry.date?.startsWith("2026-") &&
+          (entry.type === "contribution" || entry.type === "dividend")),
+    );
+    write(KEYS.history, [...existingHistory, ...recorded2026]);
+    write(KEYS.savingsRecord, canonical.savingsRecord);
+    localStorage.setItem("neh_contribution_record_version", CONTRIBUTION_RECORD_VERSION);
   }
 }
 
@@ -115,13 +143,22 @@ export function getInvestments() {
 
 export function login(email, password) {
   const members = getMembers();
+  const username = String(email || "").trim().toLowerCase();
   const member = members.find(
-    (m) => m.email.toLowerCase() === email.trim().toLowerCase(),
+    (m) =>
+      m.email.toLowerCase() === username ||
+      String(m.memberNo || "").toLowerCase() === username,
   );
   if (!member || member.password !== password) {
     throw new Error("Invalid email or password");
   }
-  const session = { memberId: member.id, role: member.role, name: member.name };
+  const session = {
+    memberId: member.id,
+    relatedMemberId: member.relatedMemberId || member.id,
+    role: member.role,
+    name: member.name,
+    signedInAt: new Date().toISOString(),
+  };
   write(KEYS.session, session);
   return session;
 }
@@ -131,7 +168,12 @@ export function getSession() {
   if (!session) return null;
   const member = getMembers().find((m) => m.id === session.memberId);
   if (!member) return null;
-  return { ...session, name: member.name };
+  return {
+    ...session,
+    name: member.name,
+    role: member.role,
+    relatedMemberId: member.relatedMemberId || member.id,
+  };
 }
 
 export function logout() {
@@ -819,10 +861,98 @@ export function getMonthRegister(month) {
 
 // ---------- Withdrawals ----------
 
+export function getContributionTotalsByMonth() {
+  const totals = new Map();
+  read(KEYS.history, []).forEach((entry) => {
+    if (!entry || entry.type !== "contribution") return;
+    const month = String(entry.date || "").slice(0, 7);
+    if (!month) return;
+    totals.set(month, (totals.get(month) || 0) + Number(entry.amount || 0));
+  });
+  return Array.from(totals.entries())
+    .map(([month, total]) => ({ month, total }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
 export function getWithdrawals() {
-  return read(KEYS.withdrawals, [])
+  const official = read(KEYS.transactions, []);
+  const legacy = read(KEYS.withdrawals, []);
+
+  if (official.length === 0 && legacy.length > 0) {
+    write(KEYS.transactions, legacy);
+    return legacy.slice().sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  return official
     .slice()
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+}
+
+export function addOfficialTransaction({
+  title,
+  amount,
+  date,
+  reason,
+  bankRef,
+  evidenceName,
+  evidenceDataUrl,
+  recordedBy = "Treasurer",
+  requiredApprovers = ["chairperson", "vicechairperson", "treasurer"],
+}) {
+  const value = Math.abs(Number(amount));
+  if (!title || !value) throw new Error("Transaction title and amount are required");
+
+  const txn = {
+    id: `txn-${Date.now()}`,
+    title: String(title).trim(),
+    amount: value,
+    date: date || today(),
+    reason: reason || "",
+    bankRef: bankRef || "",
+    evidenceName: evidenceName || "",
+    evidenceDataUrl: evidenceDataUrl || "",
+    recordedBy,
+    requiredApprovers,
+    approvals: {
+      chairperson: false,
+      vicechairperson: false,
+      treasurer: false,
+    },
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+
+  const list = read(KEYS.transactions, []);
+  list.push(txn);
+  write(KEYS.transactions, list);
+  return txn;
+}
+
+export function approveOfficialTransaction(transactionId, roleKey, approvedByName) {
+  const list = read(KEYS.transactions, []);
+  const txn = list.find((item) => item.id === transactionId);
+  if (!txn) throw new Error("Transaction not found");
+
+  const role = String(roleKey || "").trim();
+  if (!role || !txn.requiredApprovers.includes(role)) {
+    throw new Error("This official role is not required to approve this transaction");
+  }
+
+  txn.approvals = { ...txn.approvals, [role]: true };
+  txn.approvedBy = {
+    ...(txn.approvedBy || {}),
+    [role]: approvedByName || role,
+  };
+
+  const allApproved = txn.requiredApprovers.every((r) => txn.approvals[r]);
+  txn.status = allApproved ? "approved" : "pending";
+
+  write(KEYS.transactions, list);
+  return txn;
+}
+
+export function getPendingOfficialTransactions() {
+  return getWithdrawals().filter((txn) => txn.status !== "approved");
 }
 
 export function addWithdrawal({ memberId, amount, reason }) {
@@ -1314,7 +1444,7 @@ export function backupAll() {
   const keys = [
     "members", "accounts", "history", "fees", "investments",
     "documents", "minutes", "savingsRecord", "config", "meetings",
-    "fines", "loans", "withdrawals", "banks", "mmf",
+    "fines", "loans", "withdrawals", "transactions", "banks", "mmf",
     "announcements", "actionItems", "subCommittees", "events", "statements",
   ];
   const data = {};

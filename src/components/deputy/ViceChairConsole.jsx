@@ -79,8 +79,6 @@ export default function ViceChairConsole({ session, onLogout }) {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
-        <RoleMandate roleKey="vicechairperson" holder={holder} />
-
         <nav className="mt-8 flex flex-wrap gap-2">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -153,6 +151,7 @@ export default function ViceChairConsole({ session, onLogout }) {
                   </div>
                 )}
               </section>
+              <RoleMandate roleKey="vicechairperson" holder={holder} />
             </div>
           )}
 

@@ -84,17 +84,39 @@ const PHONES = {
   "Danson Ngumba": "0754 321 098",
 };
 
+// Contact details supplied in Members.docx, matched to the permanent NE roster.
+export const MEMBER_CONTACTS_BY_NO = {
+  "NE-001": { name: "John Thiong'o", phone: "0714065805", email: "johndhiosh@gmail.com" },
+  "NE-002": { name: "David Mugo", phone: "0702268668", email: "dmugoson@gmail.com" },
+  "NE-003": { name: "Peter Maina", phone: "0702649377", email: "mainangugi5@gmail.com" },
+  "NE-004": { name: "Vincent Nganga", phone: "0723563899", email: "vincentnganga97@gmail.com" },
+  "NE-006": { name: "Benson Macharia", phone: "0707456576", email: "machariaben018@gmail.com" },
+  "NE-007": { name: "Jane Wangari", phone: "0712517733", email: "wangarijane1515@gmail.com" },
+  "NE-010": { name: "Danson Ngumba", phone: "0790539275", email: "ngumbamuchoki94@gmail.com" },
+  "NE-011": { name: "Stanley Ndiba", phone: "0742114791", email: "" },
+  "NE-012": { name: "Simon Kamau", phone: "0708540262", email: "simonkiiru66@gmail.com" },
+  "NE-013": { name: "Nelius Waithera", phone: "0723069854", email: "neliusirungu30@gmail.com" },
+  "NE-014": { name: "Marvin Karanja", phone: "0727471131", email: "karanjamarv@gmail.com" },
+  "NE-015": { name: "Susan Wambui", phone: "0759770390", email: "suwamu45@gmail.com" },
+  "NE-017": { name: "John Maina", phone: "0705769024", email: "jm695369@gmail.com" },
+  "NE-018": { name: "Maureen Wanjiku", phone: "0708055468", email: "shikohmaureenm@gmail.com" },
+  "NE-020": { name: "Peter Kariuki", phone: "0759285091", email: "peterkariukiirungu@gmail.com" },
+  "NE-021": { name: "Peter Muchoki", phone: "0702144569", email: "peterndabi17@gmail.com" },
+};
+
 const MEMBERS = NAMES.map((name, i) => {
   const id = `m${i + 1}`;
+  const memberNo = `NE-${String(i + 1).padStart(3, "0")}`;
+  const contact = MEMBER_CONTACTS_BY_NO[memberNo];
   return {
     id,
-    memberNo: `NE-${String(i + 1).padStart(3, "0")}`,
-    name,
-    email: `${emailSlug(name)}@example.com`,
+    memberNo,
+    name: contact?.name || name,
+    email: contact?.email || `${emailSlug(name)}@example.com`,
     password: name === "David Muhia" ? "password1" : `password${i + 1}`,
     role: "member",
     occupation: "",
-    phone: PHONES[name] || "",
+    phone: contact?.phone || PHONES[name] || "",
     joined: JOINED[name],
   };
 });
@@ -108,7 +130,7 @@ const SKIPPED_MONTHS = {
   "Benson Macharia": ["2026-03", "2026-04"],
   "Peter Maina": [],
   "Jane Wangari": ["2025-11", "2026-08"],
-  "Nelius Waithira": ["2026-05"],
+  "Nelius Waithera": ["2026-05"],
   "Kenneth Muchoki": ["2026-01", "2026-07"],
   "Vincent Ng'ang'a": ["2026-02", "2026-03"],
   "Kevin Kagwi": ["2025-10"],
@@ -119,6 +141,32 @@ const SKIPPED_MONTHS = {
 };
 
 const HISTORY_RANGE = ["2023-01", "2026-09"];
+
+// Authoritative 2026 contribution entries from the uploaded savings record.
+// Values are ordered Jan-Dec; zero means no contribution was recorded.
+const CONTRIBUTIONS_2026 = {
+  "NE-001": [500, 500, 500, 500, 500, 500, 500, 500, 0, 0, 0, 0],
+  "NE-002": [1000, 1000, 0, 1100, 1600, 0, 1200, 0, 0, 0, 0, 0],
+  "NE-003": [500, 500, 500, 500, 600, 500, 1100, 500, 0, 0, 0, 0],
+  "NE-004": [500, 0, 500, 500, 500, 500, 500, 500, 0, 0, 0, 0],
+  "NE-005": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-006": [0, 2000, 1000, 500, 500, 500, 500, 500, 0, 0, 0, 0],
+  "NE-007": [0, 1000, 0, 700, 500, 500, 1100, 0, 0, 0, 0, 0],
+  "NE-008": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-009": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-010": [0, 500, 5000, 500, 500, 0, 4200, 2000, 0, 0, 0, 0],
+  "NE-011": [100, 0, 1200, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-012": [2000, 0, 1000, 500, 500, 1000, 500, 500, 0, 0, 0, 0],
+  "NE-013": [0, 1000, 2200, 1200, 0, 1300, 0, 600, 0, 0, 0, 0],
+  "NE-014": [500, 500, 500, 500, 1500, 500, 500, 500, 0, 0, 0, 0],
+  "NE-015": [0, 0, 1000, 2000, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-016": [500, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-017": [500, 1500, 1500, 1500, 0, 3500, 0, 3000, 0, 0, 0, 0],
+  "NE-018": [0, 5000, 2400, 500, 500, 500, 500, 1500, 0, 0, 0, 0],
+  "NE-019": [0, 0, 1300, 2700, 0, 0, 0, 0, 0, 0, 0, 0],
+  "NE-020": [0, 1600, 0, 500, 3000, 0, 0, 0, 0, 0, 0, 0],
+  "NE-021": [10000, 0, 0, 5600, 0, 0, 0, 6000, 0, 0, 0, 0],
+};
 
 function eachMonth(start, end) {
   const [sy, sm] = start.split("-").map(Number);
@@ -706,9 +754,41 @@ export function buildSeed() {
     fees.push(...memberFees);
   }
 
+  for (const member of members) {
+    const monthly = CONTRIBUTIONS_2026[member.memberNo];
+    if (!monthly) continue;
+
+    history.splice(
+      0,
+      history.length,
+      ...history.filter(
+        (entry) => !(entry.memberId === member.id && entry.date.startsWith("2026-")),
+      ),
+    );
+
+    monthly.forEach((amount, monthIndex) => {
+      if (!amount) return;
+      const month = String(monthIndex + 1).padStart(2, "0");
+      history.push({
+        id: `${member.id}-2026-${month}-recorded`,
+        memberId: member.id,
+        date: `2026-${month}-05`,
+        amount,
+        type: "contribution",
+        note: `2026 ${month} contribution (uploaded record)`,
+      });
+    });
+  }
+
   for (let i = 0; i < members.length; i++) {
     const member = members[i];
-    const row = SAVINGS_RECORD_ROWS.find((r) => r.name === member.name) || null;
+    const row = SAVINGS_RECORD_ROWS.find((r) =>
+      r.name === member.name ||
+      (member.memberNo === "NE-002" && r.name === "David Muhia") ||
+      (member.memberNo === "NE-004" && r.name === "Vincent Ng'ang'a") ||
+      (member.memberNo === "NE-013" && r.name === "Nelius Waithira") ||
+      (member.memberNo === "NE-017" && r.name === "John Macharia"),
+    ) || null;
     if (!row) continue;
 
     const account = accounts.find((a) => a.memberId === member.id);

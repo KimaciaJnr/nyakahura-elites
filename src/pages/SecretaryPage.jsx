@@ -3,6 +3,16 @@ import { useAuth } from "../auth/AuthContext";
 import AuthPage from "./AuthPage";
 import SecretaryConsole from "../components/secretary/SecretaryConsole";
 
+const ROLE_HOME = {
+  member: "/account",
+  admin: "/admin",
+  treasurer: "/treasurer",
+  secretary: "/secretary",
+  chairperson: "/chairperson",
+  vicechairperson: "/vice-chair",
+  organising: "/organising",
+};
+
 export default function SecretaryPage() {
   const { session, logout } = useAuth();
 
@@ -10,14 +20,8 @@ export default function SecretaryPage() {
     return <AuthPage initialMode="secretary" />;
   }
 
-  if (session.role === "admin") {
-    return <Navigate to="/admin" replace />;
-  }
-  if (session.role === "member") {
-    return <Navigate to="/account" replace />;
-  }
-  if (session.role === "treasurer") {
-    return <Navigate to="/treasurer" replace />;
+  if (session.role in ROLE_HOME && session.role !== "secretary") {
+    return <Navigate to={ROLE_HOME[session.role]} replace />;
   }
 
   return <SecretaryConsole session={session} onLogout={logout} />;

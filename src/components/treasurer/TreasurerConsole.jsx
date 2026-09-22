@@ -182,8 +182,6 @@ export default function TreasurerConsole({ session, onLogout }) {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10 lg:px-10">
-        <RoleMandate roleKey="treasurer" holder={ownMember} />
-
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Active members" value={stats.memberCount} accent="text-white" />
           <Stat label="Savings pool" value={KES(stats.savingsPool)} accent="text-green" />
@@ -240,6 +238,9 @@ export default function TreasurerConsole({ session, onLogout }) {
               <CashPosition onChanged={() => setRefresh((n) => n + 1)} />
             </div>
             <Overview poolYearly={poolYearly} />
+            <div className="mt-10">
+              <RoleMandate roleKey="treasurer" holder={ownMember} />
+            </div>
           </>
         )}
         {tab === "register" && (
@@ -279,16 +280,26 @@ export default function TreasurerConsole({ session, onLogout }) {
 }
 
 function Overview({ poolYearly }) {
-  const years = poolYearly.map((y) => y.year);
-  const defaultA = years[Math.max(0, years.length - 2)] || years[0];
-  const defaultB = years[years.length - 1] || years[0];
+  const yearValues = poolYearly.map((y) => y.year);
+  const monthValues = useMemo(() => getContributionTotalsByMonth(), []);
+  const defaultA = yearValues[Math.max(0, yearValues.length - 2)] || yearValues[0];
+  const defaultB = yearValues[yearValues.length - 1] || yearValues[0];
+  const defaultMonthA = monthValues[Math.max(0, monthValues.length - 2)]?.month || monthValues[0]?.month || "";
+  const defaultMonthB = monthValues[monthValues.length - 1]?.month || monthValues[0]?.month || "";
+  const [periodMode, setPeriodMode] = useState("year");
   const [yearA, setYearA] = useState(defaultA);
   const [yearB, setYearB] = useState(defaultB);
+  const [monthA, setMonthA] = useState(defaultMonthA);
+  const [monthB, setMonthB] = useState(defaultMonthB);
 
+  const monthlyPickA = monthValues.find((m) => m.month === monthA) || { month: monthA, total: 0 };
+  const monthlyPickB = monthValues.find((m) => m.month === monthB) || { month: monthB, total: 0 };
   const pickA = poolYearly.find((y) => y.year === yearA) || { year: yearA, total: 0 };
   const pickB = poolYearly.find((y) => y.year === yearB) || { year: yearB, total: 0 };
-  const delta = pickB.total - pickA.total;
-  const pctChange = pickA.total ? Math.round((delta / pickA.total) * 100) : 0;
+  const activeA = periodMode === "year" ? pickA : monthlyPickA;
+  const activeB = periodMode === "year" ? pickB : monthlyPickB;
+  const delta = activeB.total - activeA.total;
+  const pctChange = activeA.total ? Math.round((delta / activeA.total) * 100) : 0;
 
   const record = useMemo(() => getSavingsRecord(), []);
   const statusRows = useMemo(
@@ -345,55 +356,107 @@ function Overview({ poolYearly }) {
         title="Compare periods"
         subtitle="Choose two financial years to compare"
       >
+        <div className="mb-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPeriodMode("year")}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+              periodMode === "year" ? "bg-navy text-white" : "bg-navy/5 text-navy"
+            }`}
+          >
+            Compare years
+          </button>
+          <button
+            type="button"
+            onClick={() => setPeriodMode("month")}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+              periodMode === "month" ? "bg-navy text-white" : "bg-navy/5 text-navy"
+            }`}
+          >
+            Compare months
+          </button>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-semibold text-navy" htmlFor="cmp-a">
               Period A
             </label>
-            <select
-              id="cmp-a"
-              value={yearA}
-              onChange={(e) => setYearA(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl border border-navy/10 px-4 py-3 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            {periodMode === "year" ? (
+              <select
+                id="cmp-a"
+                value={yearA}
+                onChange={(e) => setYearA(Number(e.target.value))}
+                className="mt-2 w-full rounded-xl border border-navy/10 px-4 py-3 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+              >
+                {yearValues.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                id="cmp-a"
+                value={monthA}
+                onChange={(e) => setMonthA(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-navy/10 px-4 py-3 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+              >
+                {monthValues.map((m) => (
+                  <option key={m.month} value={m.month}>
+                    {m.month}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <label className="block text-sm font-semibold text-navy" htmlFor="cmp-b">
               Period B
             </label>
-            <select
-              id="cmp-b"
-              value={yearB}
-              onChange={(e) => setYearB(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl border border-navy/10 px-4 py-3 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            {periodMode === "year" ? (
+              <select
+                id="cmp-b"
+                value={yearB}
+                onChange={(e) => setYearB(Number(e.target.value))}
+                className="mt-2 w-full rounded-xl border border-navy/10 px-4 py-3 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+              >
+                {yearValues.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                id="cmp-b"
+                value={monthB}
+                onChange={(e) => setMonthB(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-navy/10 px-4 py-3 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+              >
+                {monthValues.map((m) => (
+                  <option key={m.month} value={m.month}>
+                    {m.month}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
         <div className="mt-6 flex items-end gap-3 sm:gap-5">
-          {[pickA, pickB].map((y, i) => {
-            const max = Math.max(pickA.total, pickB.total, 1);
-            const barHeight = Math.max((y.total / max) * 140, y.total > 0 ? 10 : 4);
+          {[activeA, activeB].map((item, i) => {
+            const max = Math.max(activeA.total, activeB.total, 1);
+            const barHeight = Math.max((item.total / max) * 140, item.total > 0 ? 10 : 4);
+            const label = periodMode === "year" ? String(item.year || item.month) : String(item.month || item.year || "Period");
             return (
-              <div key={y.year} className="flex flex-1 flex-col items-center gap-2">
-                <p className="text-[11px] font-bold text-green">{KES(y.total)}</p>
+              <div key={`${label}-${i}`} className="flex flex-1 flex-col items-center gap-2">
+                <p className="text-[11px] font-bold text-green">{KES(item.total)}</p>
                 <div
                   className={`w-full rounded-t-lg ${i === 1 ? "bg-green" : "bg-navy/20"}`}
                   style={{ height: barHeight }}
                 />
-                <p className="text-xs font-semibold text-navy">{y.year}</p>
+                <p className="text-xs font-semibold text-navy">{label}</p>
               </div>
             );
           })}
@@ -401,12 +464,12 @@ function Overview({ poolYearly }) {
 
         <div className="mt-6 grid grid-cols-3 gap-3 border-t border-navy/10 pt-5">
           <div>
-            <p className="text-xs text-navy/50">{yearA} total</p>
-            <p className="font-serif text-lg font-bold text-navy">{KES(pickA.total)}</p>
+            <p className="text-xs text-navy/50">{periodMode === "year" ? `${yearA} total` : `${monthA} total`}</p>
+            <p className="font-serif text-lg font-bold text-navy">{KES(activeA.total)}</p>
           </div>
           <div>
-            <p className="text-xs text-navy/50">{yearB} total</p>
-            <p className="font-serif text-lg font-bold text-green">{KES(pickB.total)}</p>
+            <p className="text-xs text-navy/50">{periodMode === "year" ? `${yearB} total` : `${monthB} total`}</p>
+            <p className="font-serif text-lg font-bold text-green">{KES(activeB.total)}</p>
           </div>
           <div>
             <p className="text-xs text-navy/50">Change</p>

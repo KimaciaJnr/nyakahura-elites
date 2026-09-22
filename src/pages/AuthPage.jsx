@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Lock,
@@ -58,6 +58,15 @@ export default function AuthPage({ initialMode = "member" }) {
   const navigate = useNavigate();
   const { login } = useAuth();
 
+  useEffect(() => {
+    const officer = OFFICIAL_ROLES.some((r) => r.key === initialMode);
+    setSection(officer ? "officials" : "member");
+    setMode(initialMode);
+    setEmail("");
+    setPassword("");
+    setError("");
+  }, [initialMode]);
+
   const isOfficials = section === "officials";
   const activeRole = OFFICIAL_ROLES.find((r) => r.key === mode) || null;
 
@@ -83,17 +92,20 @@ export default function AuthPage({ initialMode = "member" }) {
   function handleSubmit(e) {
     e.preventDefault();
     setError("");
+
     try {
       const session = login(email, password);
       const expected = isOfficials ? activeRole.key : "member";
+
       if (session.role !== expected) {
         throw new Error(
           `That account doesn't have ${expected} access — use the matching sign-in above.`,
         );
       }
+
       navigate(getRoleHome(session.role), { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Unable to sign in with those credentials.");
     }
   }
 
@@ -241,7 +253,7 @@ export default function AuthPage({ initialMode = "member" }) {
                   className={`block text-sm font-semibold ${isOfficials && activeRole.card === "dark" ? "text-white" : "text-navy"}`}
                   htmlFor="auth-email"
                 >
-                  Email address
+                  Email address or NE ID
                 </label>
                 <div className="relative mt-2">
                   <Mail
@@ -251,12 +263,12 @@ export default function AuthPage({ initialMode = "member" }) {
                   />
                   <input
                     id="auth-email"
-                    type="email"
+                    type="text"
                     required
                     autoComplete="off"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder="you@example.com or NE-001"
                     className={isOfficials && activeRole.card === "dark" ? inputDark : inputLight}
                   />
                 </div>

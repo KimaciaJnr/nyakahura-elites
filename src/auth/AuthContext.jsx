@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   login as storeLogin,
   logout as storeLogout,
@@ -9,6 +9,17 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(() => getSession());
+
+  useEffect(() => {
+    function syncSession(event) {
+      if (event.key === "neh_session") {
+        setSession(getSession());
+      }
+    }
+
+    window.addEventListener("storage", syncSession);
+    return () => window.removeEventListener("storage", syncSession);
+  }, []);
 
   const login = useCallback((email, password) => {
     const s = storeLogin(email, password);

@@ -1,7 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import AuthPage from "./AuthPage";
-import AdminConsole from "../components/admin/AdminConsole";
+import ChairpersonConsole from "../components/chair/ChairpersonConsole";
 
 const ROLE_HOME = {
   member: "/account",
@@ -13,16 +13,20 @@ const ROLE_HOME = {
   organising: "/organising",
 };
 
-export default function AdminPage() {
+export default function ChairpersonPage() {
   const { session, logout } = useAuth();
 
   if (!session) {
-    return <AuthPage initialMode="admin" />;
+    return <AuthPage initialMode="chairperson" />;
   }
 
-  if (session.role in ROLE_HOME && session.role !== "admin") {
+  if (session.role in ROLE_HOME && session.role !== "chairperson") {
     return <Navigate to={ROLE_HOME[session.role]} replace />;
   }
 
-  return <AdminConsole onLogout={logout} />;
+  if (session.role === "chairperson") {
+    return <ChairpersonConsole session={session} onLogout={logout} />;
+  }
+
+  return <Navigate to={ROLE_HOME.member} replace />;
 }
