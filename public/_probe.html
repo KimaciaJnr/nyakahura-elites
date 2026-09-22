@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<body>
+<script>
+  localStorage.setItem(
+    "neh_session",
+    JSON.stringify({
+      memberId: "officer-treasurer",
+      relatedMemberId: "m7",
+      role: "treasurer",
+      name: "Jane Wangari",
+      signedInAt: new Date().toISOString(),
+    }),
+  );
+  localStorage.setItem("neh_version", "2026-09-organising-secretary-710");
+  location.href = "/treasurer";
+</script>
+</body>
+</html>

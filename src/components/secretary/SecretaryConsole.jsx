@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FileText,
   PenLine,
@@ -25,6 +26,7 @@ import {
 import BackToLogin from "../BackToLogin";
 import ThemeToggle from "../ThemeToggle";
 import RoleMandate from "../RoleMandate";
+import useTabNavigation from "../../lib/useTabNavigation";
 import MinutesForm from "./MinutesForm";
 import MeetingsTab from "./MeetingsTab";
 import ActionItemsTab from "./ActionItemsTab";
@@ -53,9 +55,15 @@ function fmtDate(d) {
 }
 
 export default function SecretaryConsole({ session, onLogout }) {
+  const navigate = useNavigate();
+  const { tab, goTab, tabBack } = useTabNavigation("overview", {
+    onBackAtRoot: () => {
+      onLogout();
+      navigate("/secretary", { replace: true });
+    },
+  });
   const [refresh, setRefresh] = useState(0);
   const [view, setView] = useState({ name: "list" });
-  const [tab, setTab] = useState("overview");
   const minutes = getMinutes();
 
   const approvedCount = minutes.filter((m) => m.status === "approved").length;
@@ -77,6 +85,8 @@ export default function SecretaryConsole({ session, onLogout }) {
             <BackToLogin
               to="/secretary"
               onLogout={onLogout}
+              onTabBack={tabBack}
+              signOutAtRoot
               className="inline-flex items-center gap-2 rounded-full border border-white/25 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
             >
               Back
@@ -112,7 +122,7 @@ export default function SecretaryConsole({ session, onLogout }) {
             <button
               key={t.key}
               onClick={() => {
-                setTab(t.key);
+                goTab(t.key);
                 setView({ name: "list" });
               }}
               className={`inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors ${

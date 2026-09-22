@@ -4,6 +4,7 @@ import {
   logout as storeLogout,
   getSession,
 } from "../lib/store";
+import { clearNavStack, resetNavStack, ROLE_HOME } from "../lib/navStack";
 
 const AuthContext = createContext(null);
 
@@ -23,12 +24,14 @@ export function AuthProvider({ children }) {
 
   const login = useCallback((email, password) => {
     const s = storeLogin(email, password);
+    resetNavStack(ROLE_HOME[s.role]);
     setSession(s);
     return s;
   }, []);
 
   const logout = useCallback(() => {
     storeLogout();
+    clearNavStack();
     setSession(null);
   }, []);
 

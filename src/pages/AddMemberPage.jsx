@@ -1,23 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { Shield, UserPlus, ArrowLeft, Check } from "lucide-react";
+import { Shield, UserPlus, Check } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import AuthPage from "./AuthPage";
 import MemberForm from "../components/admin/MemberForm";
-
-function BackToConsole() {
-  const navigate = useNavigate();
-  return (
-    <button
-      type="button"
-      onClick={() => navigate("/admin")}
-      className="inline-flex items-center gap-2 rounded-full border border-white/25 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Back
-    </button>
-  );
-}
+import BackToLogin from "../components/BackToLogin";
 
 function AddMemberView({ onLogout }) {
   const navigate = useNavigate();
@@ -28,7 +15,12 @@ function AddMemberView({ onLogout }) {
       <header className="border-b border-white/10 bg-navy/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
           <div className="flex items-center gap-3 lg:gap-6">
-            <BackToConsole />
+            <BackToLogin
+              to="/admin"
+              className="inline-flex items-center gap-2 rounded-full border border-white/25 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            >
+              Back
+            </BackToLogin>
             <div className="flex items-center gap-3">
               <div className="hidden h-10 w-10 items-center justify-center rounded-xl bg-gold/20 text-gold sm:inline-flex">
                 <Shield className="h-5 w-5" />

@@ -13,6 +13,7 @@ import {
   SEED_MMF,
   SEED_ANNOUNCEMENTS,
   SEED_ACTION_ITEMS,
+  SEED_EVENTS,
   MEMBER_CONTACTS_BY_NO,
 } from "../data/seed";
 
@@ -42,13 +43,16 @@ const KEYS = {
   events: "neh_events",
 };
 
-const SEED_VERSION = "2026-09-officer-portals-700";
+const SEED_VERSION = "2026-09-organising-secretary-710";
 const CONTRIBUTION_RECORD_VERSION = "2026-09-uploaded-record-2";
 
 function read(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
+    const value = raw ? JSON.parse(raw) : undefined;
+    if (value === undefined) return fallback;
+    if (Array.isArray(fallback) && !Array.isArray(value)) return fallback;
+    return value;
   } catch {
     return fallback;
   }
@@ -83,6 +87,7 @@ function seed() {
   write(KEYS.mmf, SEED_MMF);
   write(KEYS.announcements, SEED_ANNOUNCEMENTS);
   write(KEYS.actionItems, SEED_ACTION_ITEMS);
+  write(KEYS.events, SEED_EVENTS);
 }
 
 function initStore() {
@@ -93,6 +98,14 @@ function initStore() {
   } else if (!localStorage.getItem(KEYS.members)) {
     seed();
   }
+
+  // Back-fill event & handover stores for browsers that were seeded before
+  // these features existed — without resetting locally recorded data.
+  if (!localStorage.getItem(KEYS.events)) {
+    write(KEYS.events, SEED_EVENTS);
+  }
+  // Clean up the old handover store from the earlier workflow.
+  localStorage.removeItem("neh_handovers");
 
   // Apply authoritative contact updates to existing browser data without
   // resetting locally recorded transactions, approvals, or documents.
@@ -191,13 +204,13 @@ export function getAccount(memberId) {
 export function getHistory(memberId) {
   return read(KEYS.history, [])
     .filter((e) => e.memberId === memberId)
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 }
 
 export function getFees(memberId) {
   return read(KEYS.fees, [])
     .filter((f) => f.memberId === memberId && f.status === "unpaid")
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    .sort((a, b) => String(a.dueDate || "").localeCompare(String(b.dueDate || "")));
 }
 
 export function addMember({ name, email, password, occupation, monthlyContribution }) {
@@ -330,7 +343,9 @@ export function settleFee(feeId) {
 const MAX_FILE_SIZE = 2_500_000;
 
 export function getFinanceDocuments() {
-  return read(KEYS.documents, []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return read(KEYS.documents, [])
+    .slice()
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 }
 
 export function addFinanceDocument(doc) {
@@ -355,7 +370,7 @@ export function deleteFinanceDocument(id) {
 export function getMinutes() {
   return read(KEYS.minutes, [])
     .slice()
-    .sort((a, b) => b.meetingDate.localeCompare(a.meetingDate));
+    .sort((a, b) => String(b.meetingDate || "").localeCompare(String(a.meetingDate || "")));
 }
 
 export function getMinutesById(id) {
@@ -404,7 +419,7 @@ export function getMemberSavings(memberId) {
 
 export function getMemberYearlySavings(memberId) {
   const row = getMemberSavings(memberId);
-  if (!row) return [];
+  if (!row || !row.years) return [];
   return [2023, 2024, 2025, 2026]
     .filter((year) => row.years[year] != null)
     .map((year) => ({ year, total: row.years[year] }));
@@ -414,7 +429,7 @@ export function getPoolYearlyTotals() {
   const record = getSavingsRecord();
   return [2023, 2024, 2025, 2026].map((year) => ({
     year,
-    total: record.reduce((sum, r) => sum + (r.years[year] || 0), 0),
+    total: record.reduce((sum, r) => sum + ((r.years && r.years[year]) || 0), 0),
   }));
 }
 
@@ -497,7 +512,7 @@ export function contributionDeadline(month) {
 export function getContributionStatements() {
   return read(KEYS.statements, [])
     .slice()
-    .sort((a, b) => b.month.localeCompare(a.month));
+    .sort((a, b) => String(b.month || "").localeCompare(String(a.month || "")));
 }
 
 function normalizeName(name) {
@@ -880,7 +895,7 @@ export function getWithdrawals() {
 
   if (official.length === 0 && legacy.length > 0) {
     write(KEYS.transactions, legacy);
-    return legacy.slice().sort((a, b) => b.date.localeCompare(a.date));
+    return legacy.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   }
 
   return official
@@ -1014,7 +1029,7 @@ export function recordMemberWithdrawal({ memberId, amount, reason, date }) {
 export function getFinesLog() {
   return read(KEYS.fines, [])
     .slice()
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 }
 
 export function getMemberFines(memberId) {
@@ -1057,7 +1072,7 @@ export function deleteFine(id) {
 export function getLoans() {
   return read(KEYS.loans, [])
     .slice()
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 }
 
 export function getMemberLoans(memberId) {
@@ -1119,7 +1134,7 @@ export function deleteLoan(id) {
 export function getMeetings() {
   return read(KEYS.meetings, [])
     .slice()
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 }
 
 export function getNextMeeting() {
@@ -1253,7 +1268,7 @@ export function deleteActionItem(id) {
 export function getAnnouncements() {
   return read(KEYS.announcements, [])
     .slice()
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 }
 
 export function addAnnouncement({ title, body, published }) {
@@ -1332,17 +1347,24 @@ export function getEvents() {
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 }
 
-export function addEvent({ title, type, date, goal, details, status }) {
-  if (!title) throw new Error("Event title required");
+export function addEvent(data) {
+  if (!data || !data.title) throw new Error("Event title required");
   const list = read(KEYS.events, []);
   const next = {
     id: `evt-${Date.now()}`,
-    title,
-    type: type || "Other",
-    date: date || today(),
-    goal: goal || "",
-    details: details || "",
-    status: status || "planned",
+    title: data.title,
+    type: data.type || "Other",
+    date: data.date || today(),
+    time: data.time || "",
+    venue: data.venue || "",
+    school: data.school || "",
+    goal: data.goal || "",
+    details: data.details || "",
+    program: data.program || [],
+    budget: data.budget || [],
+    contact: data.contact || "",
+    recurring: data.recurring || "",
+    status: data.status || "planned",
     createdAt: today(),
   };
   list.push(next);
@@ -1391,7 +1413,8 @@ export function addBankTxn(id, amount, note) {
 }
 
 export function getMMF() {
-  return read(KEYS.mmf, null);
+  const mmf = read(KEYS.mmf, null);
+  return mmf && typeof mmf === "object" && !Array.isArray(mmf) ? mmf : null;
 }
 
 export function updateMMF(updates) {

@@ -27,6 +27,7 @@ import {
   X,
   Clock,
   MapPin,
+  GraduationCap,
 } from "lucide-react";
 import BackLink from "../BackLink";
 import BackToLogin from "../BackToLogin";
@@ -46,6 +47,7 @@ import {
   getMinutes,
   getContributionForMonth,
   getPoolStats,
+  getEvents,
   KES,
 } from "../../lib/store";
 
@@ -81,6 +83,19 @@ export default function AccountDashboard({ session, onLogout }) {
   const yearly = getMemberYearlySavings(session.memberId);
   const record = getMemberSavings(session.memberId);
   const pool = getPoolStats();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const mentorEvents = getEvents().filter((e) => e.type === "Mentorship");
+  const upcomingMentor = mentorEvents
+    .filter((e) => e.status !== "completed" && e.status !== "cancelled" && e.date >= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const mentorCompleted = mentorEvents.filter((e) => e.status === "completed").length;
+  const fmtShortDate = (d) =>
+    new Date(d + "T00:00:00").toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
 
   if (!account) {
     return (
@@ -628,6 +643,56 @@ export default function AccountDashboard({ session, onLogout }) {
               );
             })}
           </div>
+        </section>
+
+        <section className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-navy/5 sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-gold-dark">
+                Giving back
+              </p>
+              <h2 className="mt-2 flex items-center gap-2 font-serif text-2xl font-bold text-navy">
+                <GraduationCap className="h-6 w-6 text-green" />
+                Mentorship & community
+              </h2>
+              <p className="mt-1 text-sm text-navy/60">
+                Every year the group hosts mentorship days at neighbourhood schools to
+                share career talks and a saving culture with the learners.
+              </p>
+            </div>
+            <p className="text-sm text-navy/60">
+              Visits completed:{" "}
+              <span className="font-bold text-green">{mentorCompleted}</span>
+            </p>
+          </div>
+
+          {upcomingMentor.length === 0 ? (
+            <p className="mt-6 rounded-2xl bg-sand px-5 py-6 text-center text-sm text-navy/50">
+              No mentorship visits are planned right now — check back soon.
+            </p>
+          ) : (
+            <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+              {upcomingMentor.map((e) => (
+                <li key={e.id} className="rounded-2xl bg-sand p-5 ring-1 ring-navy/5">
+                  <p className="text-xs font-bold uppercase tracking-wider text-green">
+                    {e.school}
+                  </p>
+                  <p className="mt-2 font-serif text-base font-bold text-navy">
+                    {fmtShortDate(e.date)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-navy/50">
+                    {e.time ? `at ${e.time} · ` : ""}
+                    {e.venue}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <p className="mt-4 text-xs leading-relaxed text-navy/50">
+            Official notices about mentorship days are sent by the Secretary once the plan
+            is approved by the executive.
+          </p>
         </section>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-2">

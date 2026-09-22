@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Wallet,
   TrendingUp,
@@ -32,11 +33,13 @@ import {
   getPoolYearlyTotals,
   getUnpaidTotals,
   getPoolStats,
+  getContributionTotalsByMonth,
   KES,
 } from "../../lib/store";
 import BackToLogin from "../BackToLogin";
 import ThemeToggle from "../ThemeToggle";
 import RoleMandate from "../RoleMandate";
+import useTabNavigation from "../../lib/useTabNavigation";
 import RegisterTab from "./RegisterTab";
 import FinesLoansTab from "./FinesLoansTab";
 import WithdrawalsTab from "./WithdrawalsTab";
@@ -120,7 +123,13 @@ function BarChart({ data, numberClass }) {
 }
 
 export default function TreasurerConsole({ session, onLogout }) {
-  const [tab, setTab] = useState("overview");
+  const navigate = useNavigate();
+  const { tab, goTab, tabBack } = useTabNavigation("overview", {
+    onBackAtRoot: () => {
+      onLogout();
+      navigate("/treasurer", { replace: true });
+    },
+  });
   const [refresh, setRefresh] = useState(0);
   const [statementMember, setStatementMember] = useState(null);
   const docs = useMemo(() => getFinanceDocuments(), [refresh]);
@@ -153,6 +162,8 @@ export default function TreasurerConsole({ session, onLogout }) {
             <BackToLogin
               to="/treasurer"
               onLogout={onLogout}
+              onTabBack={tabBack}
+              signOutAtRoot
               className="inline-flex items-center gap-2 rounded-full border border-white/25 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
             >
               Back
@@ -218,7 +229,7 @@ export default function TreasurerConsole({ session, onLogout }) {
             return (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => goTab(t.key)}
                 className={`inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors ${
                   active
                     ? "bg-green text-white"
@@ -599,10 +610,10 @@ function Ledger({ onStatement }) {
       .filter(
         (r) =>
           !q ||
-          r.name.toLowerCase().includes(q) ||
-          r.memberNo.toLowerCase().includes(q),
+          String(r.name || "").toLowerCase().includes(q) ||
+          String(r.memberNo || "").toLowerCase().includes(q),
       )
-      .sort((a, b) => a.memberNo.localeCompare(b.memberNo));
+      .sort((a, b) => String(a.memberNo || "").localeCompare(String(b.memberNo || "")));
   }, [members, record, query]);
 
   const totals = useMemo(() => {
@@ -1017,8 +1028,8 @@ function DocumentsList({ docs, onChanged }) {
                       {doc.periodFrom && (
                         <span className="inline-flex items-center gap-1">
                           <CalendarRange className="h-3.5 w-3.5" />
-                          {doc.periodFrom.replace("-", "/")}
-                          {doc.periodTo ? ` — ${doc.periodTo.replace("-", "/")}` : ""}
+                          {String(doc.periodFrom).replace("-", "/")}
+                          {doc.periodTo ? ` — ${String(doc.periodTo).replace("-", "/")}` : ""}
                         </span>
                       )}
                       <span>

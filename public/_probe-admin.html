@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<body>
+<script>
+  localStorage.setItem(
+    "neh_session",
+    JSON.stringify({
+      memberId: "admin",
+      relatedMemberId: "admin",
+      role: "admin",
+      name: "System Admin",
+      signedInAt: new Date().toISOString(),
+    }),
+  );
+  localStorage.setItem("neh_version", "2026-09-organising-secretary-710");
+  location.href = "/admin";
+</script>
+</body>
+</html>

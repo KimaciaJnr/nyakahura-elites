@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Crown,
   LayoutDashboard,
   Stamp,
   CalendarDays,
   Megaphone,
-  Users,
+  Wallet,
   MapPin,
   Clock,
   CheckCircle2,
@@ -23,7 +24,9 @@ import {
 import BackToLogin from "../BackToLogin";
 import ThemeToggle from "../ThemeToggle";
 import RoleMandate from "../RoleMandate";
+import useTabNavigation from "../../lib/useTabNavigation";
 import AnnouncementsTab from "../secretary/AnnouncementsTab";
+import FinancesMembers from "./FinancesMembers";
 
 function fmtDate(d) {
   const date = new Date(d + "T00:00:00");
@@ -41,13 +44,20 @@ function KES(n) {
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "finances", label: "Finances & members", icon: Wallet },
   { key: "minutes", label: "Minutes & approvals", icon: Stamp },
   { key: "meetings", label: "Meetings", icon: CalendarDays },
   { key: "announcements", label: "Announcements", icon: Megaphone },
 ];
 
 export default function ChairpersonConsole({ session, onLogout }) {
-  const [tab, setTab] = useState("overview");
+  const navigate = useNavigate();
+  const { tab, goTab, tabBack } = useTabNavigation("overview", {
+    onBackAtRoot: () => {
+      onLogout();
+      navigate("/chairperson", { replace: true });
+    },
+  });
   const [refresh, setRefresh] = useState(0);
 
   const members = getActiveMembers();
@@ -67,6 +77,8 @@ export default function ChairpersonConsole({ session, onLogout }) {
             <BackToLogin
               to="/chairperson"
               onLogout={onLogout}
+              onTabBack={tabBack}
+              signOutAtRoot
               className="inline-flex items-center gap-2 rounded-full border border-white/25 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10"
             >
               Back
@@ -103,7 +115,7 @@ export default function ChairpersonConsole({ session, onLogout }) {
             return (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => goTab(t.key)}
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
                   active
                     ? `bg-gold-dark text-white ${" "}`
@@ -158,7 +170,7 @@ export default function ChairpersonConsole({ session, onLogout }) {
                     </div>
                   </div>
                   <button
-                    onClick={() => setTab("meetings")}
+                    onClick={() => goTab("meetings")}
                     className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-navy-light"
                   >
                     View meetings
@@ -174,6 +186,10 @@ export default function ChairpersonConsole({ session, onLogout }) {
               <RoleMandate roleKey="chairperson" holder={holder} />
             </div>
           </div>
+        )}
+
+        {tab === "finances" && (
+          <FinancesMembers onChanged={() => setRefresh((n) => n + 1)} />
         )}
 
         {tab === "minutes" && (

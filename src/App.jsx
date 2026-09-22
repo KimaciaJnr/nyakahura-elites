@@ -1,4 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { recordPath } from "./lib/navStack";
 import LandingPage from "./pages/LandingPage";
 import AccountPage from "./pages/AccountPage";
 import AdminPage from "./pages/AdminPage";
@@ -10,10 +13,19 @@ import ViceChairPage from "./pages/ViceChairPage";
 import OrganisingPage from "./pages/OrganisingPage";
 import ScrollToTop from "./components/ScrollToTop";
 
+function NavTracker() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    recordPath(pathname);
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <>
       <ScrollToTop />
+      <NavTracker />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/account" element={<AccountPage />} />

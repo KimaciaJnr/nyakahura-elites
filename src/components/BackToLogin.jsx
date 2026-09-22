@@ -1,14 +1,29 @@
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { previousPortalPath } from "../lib/navStack";
 
-export default function BackToLogin({ to = "/account", onLogout, children, className }) {
+export default function BackToLogin({
+  to = "/account",
+  onLogout,
+  onTabBack,
+  signOutAtRoot = false,
+  children,
+  className,
+}) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prev = previousPortalPath(location.pathname);
 
   return (
     <button
       type="button"
       onClick={() => {
-        onLogout();
+        if (onTabBack && onTabBack()) return;
+        if (prev && !signOutAtRoot) {
+          navigate(-1);
+          return;
+        }
+        onLogout?.();
         navigate(to, { replace: true });
       }}
       className={className}

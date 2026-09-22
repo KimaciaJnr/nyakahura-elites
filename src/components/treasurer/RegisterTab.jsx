@@ -83,8 +83,8 @@ export default function RegisterTab({ onChanged }) {
   const filtered = q
     ? rows.filter(
         (r) =>
-          r.member.name.toLowerCase().includes(q) ||
-          r.member.memberNo.toLowerCase().includes(q),
+          String(r.member && r.member.name || "").toLowerCase().includes(q) ||
+          String(r.member && r.member.memberNo || "").toLowerCase().includes(q),
       )
     : rows;
 

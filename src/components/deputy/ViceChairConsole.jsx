@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   UserCog,
   LayoutDashboard,
   ListTree,
   BookUser,
+  Megaphone,
   Plus,
   Trash2,
   Users,
@@ -19,7 +21,9 @@ import {
 import BackToLogin from "../BackToLogin";
 import ThemeToggle from "../ThemeToggle";
 import RoleMandate from "../RoleMandate";
+import useTabNavigation from "../../lib/useTabNavigation";
 import DirectoryTab from "../secretary/DirectoryTab";
+import AnnouncementsTab from "../secretary/AnnouncementsTab";
 
 const STATUS_STYLE = {
   active: "bg-green/10 text-green",
@@ -31,10 +35,17 @@ const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "committees", label: "Sub-committees", icon: ListTree },
   { key: "directory", label: "Directory", icon: BookUser },
+  { key: "announcements", label: "Announcements", icon: Megaphone },
 ];
 
 export default function ViceChairConsole({ session, onLogout }) {
-  const [tab, setTab] = useState("overview");
+  const navigate = useNavigate();
+  const { tab, goTab, tabBack } = useTabNavigation("overview", {
+    onBackAtRoot: () => {
+      onLogout();
+      navigate("/vice-chair", { replace: true });
+    },
+  });
   const [refresh, setRefresh] = useState(0);
 
   const members = getActiveMembers();
@@ -50,7 +61,8 @@ export default function ViceChairConsole({ session, onLogout }) {
             <BackToLogin
               to="/vice-chair"
               onLogout={onLogout}
-              className="inline-flex items-center gap-2 rounded-full bg-navy/5 px-3.5 py-2 text-sm font-semibold text-navy transition-colors hover:bg-navy/10"
+              onTabBack={tabBack}
+              signOutAtRoot
             >
               Back
             </BackToLogin>
@@ -86,7 +98,7 @@ export default function ViceChairConsole({ session, onLogout }) {
             return (
               <button
                 key={t.key}
-                onClick={() => setTab(t.key)}
+                onClick={() => goTab(t.key)}
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
                   active
                     ? "bg-green text-white"
@@ -141,7 +153,7 @@ export default function ViceChairConsole({ session, onLogout }) {
                           </p>
                         </div>
                         <button
-                          onClick={() => setTab("committees")}
+                          onClick={() => goTab("committees")}
                           className="text-xs font-semibold text-navy/70 hover:text-navy"
                         >
                           Manage
@@ -163,6 +175,10 @@ export default function ViceChairConsole({ session, onLogout }) {
           )}
 
           {tab === "directory" && <DirectoryTab />}
+
+          {tab === "announcements" && (
+            <AnnouncementsTab onChanged={() => setRefresh((n) => n + 1)} />
+          )}
         </div>
       </main>
     </div>

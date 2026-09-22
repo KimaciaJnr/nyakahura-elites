@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import SettingsPanel from "./SettingsPanel";
+import ReadinessPanel from "./ReadinessPanel";
 import {
   Shield,
   Users,
@@ -468,6 +469,10 @@ export default function AdminConsole({ onLogout }) {
               {accounts.length}
             </p>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <ReadinessPanel />
         </div>
 
         <div className="mt-8">
