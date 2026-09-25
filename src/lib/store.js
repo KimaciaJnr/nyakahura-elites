@@ -39,6 +39,7 @@ const KEYS = {
   announcements: "neh_announcements",
   actionItems: "neh_action_items",
   statements: "neh_contribution_statements",
+  treasuryAudit: "neh_treasury_audit",
   subCommittees: "neh_subcommittees",
   events: "neh_events",
 };
@@ -187,6 +188,46 @@ export function getSession() {
     role: member.role,
     relatedMemberId: member.relatedMemberId || member.id,
   };
+}
+
+export function getTreasuryAuditLog() {
+  return read(KEYS.treasuryAudit, [])
+    .slice()
+    .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")));
+}
+
+export function recordTreasuryAudit({
+  type,
+  title,
+  detail,
+  amount,
+  account,
+  memberId,
+  role,
+  date,
+  coSigners,
+  receiptName,
+  receiptDataUrl,
+}) {
+  const entry = {
+    id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    type: type || "treasury",
+    title: title || "Treasury update",
+    detail: detail || "",
+    amount: Number(amount) || 0,
+    account: account || "",
+    memberId: memberId || null,
+    role: role || "",
+    coSigners: Array.isArray(coSigners) ? coSigners : [],
+    receiptName: receiptName || "",
+    receiptDataUrl: receiptDataUrl || "",
+    date: date || today(),
+    createdAt: new Date().toISOString(),
+  };
+
+  const list = read(KEYS.treasuryAudit, []);
+  write(KEYS.treasuryAudit, [entry, ...list].slice(0, 80));
+  return entry;
 }
 
 export function logout() {
@@ -642,6 +683,9 @@ export function saveContributionStatement({ month, fileName, rows, unmatched }) 
   if (!month || !fileName || !Array.isArray(rows)) {
     throw new Error("A month, file name and parsed rows are required");
   }
+  if (Array.isArray(unmatched) && unmatched.length > 0) {
+    throw new Error("Resolve all unmatched statement rows before publishing.");
+  }
   const deadline = contributionDeadline(month);
 
   // Re-uploads must first roll back the previous statement completely so the
@@ -772,6 +816,16 @@ export function saveContributionStatement({ month, fileName, rows, unmatched }) 
     ...read(KEYS.statements, []).filter((s) => s.month !== month),
     stmt,
   ]);
+
+  recordTreasuryAudit({
+    type: "statement",
+    title: `Contribution statement published · ${month}`,
+    detail: `${rows.length} records captured from ${fileName}`,
+    amount: rows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    role: "treasurer",
+    date: today(),
+  });
+
   return stmt;
 }
 
@@ -813,6 +867,15 @@ export function deleteContributionStatement(month) {
     KEYS.statements,
     read(KEYS.statements, []).filter((s) => s.month !== month),
   );
+
+  recordTreasuryAudit({
+    type: "statement",
+    title: `Statement removed · ${month}`,
+    detail: stmt ? `Reverted uploaded data for ${stmt.fileName}` : `Cleared statement data for ${month}`,
+    amount: 0,
+    role: "treasurer",
+    date: today(),
+  });
 }
 
 export function getMonthRegister(month) {
@@ -909,6 +972,7 @@ export function addOfficialTransaction({
   date,
   reason,
   bankRef,
+  coSigners = [],
   evidenceName,
   evidenceDataUrl,
   recordedBy = "Treasurer",
@@ -924,6 +988,7 @@ export function addOfficialTransaction({
     date: date || today(),
     reason: reason || "",
     bankRef: bankRef || "",
+    coSigners: Array.isArray(coSigners) ? coSigners : [],
     evidenceName: evidenceName || "",
     evidenceDataUrl: evidenceDataUrl || "",
     recordedBy,
@@ -940,10 +1005,24 @@ export function addOfficialTransaction({
   const list = read(KEYS.transactions, []);
   list.push(txn);
   write(KEYS.transactions, list);
+
+  recordTreasuryAudit({
+    type: "withdrawal",
+    title: `Transaction logged · ${txn.title}`,
+    detail: `Recorded by ${recordedBy} for ${txn.reason || "general operations"}`,
+    amount: value,
+    account: "official",
+    role: "treasurer",
+    date: txn.date,
+    coSigners: txn.coSigners,
+    receiptName: txn.evidenceName,
+    receiptDataUrl: txn.evidenceDataUrl,
+  });
+
   return txn;
 }
 
-export function approveOfficialTransaction(transactionId, roleKey, approvedByName) {
+export function approveOfficialTransaction(transactionId, roleKey, approvedByName, actorRole) {
   const list = read(KEYS.transactions, []);
   const txn = list.find((item) => item.id === transactionId);
   if (!txn) throw new Error("Transaction not found");
@@ -953,14 +1032,34 @@ export function approveOfficialTransaction(transactionId, roleKey, approvedByNam
     throw new Error("This official role is not required to approve this transaction");
   }
 
+  const actor = String(actorRole || "").trim();
+  if (actor && actor !== role) {
+    throw new Error(`Only the ${role} role can approve this transaction.`);
+  }
+
+  const approver = String(approvedByName || "").trim();
+  if (!approver) {
+    throw new Error("Approver name is required");
+  }
+
   txn.approvals = { ...txn.approvals, [role]: true };
   txn.approvedBy = {
     ...(txn.approvedBy || {}),
-    [role]: approvedByName || role,
+    [role]: approver,
   };
 
   const allApproved = txn.requiredApprovers.every((r) => txn.approvals[r]);
   txn.status = allApproved ? "approved" : "pending";
+
+  recordTreasuryAudit({
+    type: "approval",
+    title: `Approval recorded · ${txn.title}`,
+    detail: `${approver} approved as ${role}. Status: ${txn.status}`,
+    amount: txn.amount,
+    account: "official",
+    role,
+    date: today(),
+  });
 
   write(KEYS.transactions, list);
   return txn;
@@ -1051,16 +1150,41 @@ export function addFine({ memberId, type, label, amount, date, meetingId }) {
   };
   list.push(next);
   write(KEYS.fines, list);
+
+  recordTreasuryAudit({
+    type: "fine",
+    title: `Fine recorded · ${label || type}`,
+    detail: `Member ${memberId} recorded as ${type}`,
+    amount: Number(amount),
+    memberId,
+    role: "treasurer",
+    date: date || today(),
+  });
+
   return next;
 }
 
 export function settleFine(id) {
+  const list = read(KEYS.fines, []);
+  const fine = list.find((f) => f.id === id);
   write(
     KEYS.fines,
-    read(KEYS.fines, []).map((f) =>
+    list.map((f) =>
       f.id === id ? { ...f, status: "paid", paidDate: today() } : f,
     ),
   );
+
+  if (fine) {
+    recordTreasuryAudit({
+      type: "fine",
+      title: `Fine settled · ${fine.label}`,
+      detail: `Member ${fine.memberId} paid ${fine.amount}`,
+      amount: Number(fine.amount),
+      memberId: fine.memberId,
+      role: "treasurer",
+      date: today(),
+    });
+  }
 }
 
 export function deleteFine(id) {
@@ -1100,6 +1224,17 @@ export function addLoan({ memberId, amount, interestPct, date, reason }) {
   };
   list.push(next);
   write(KEYS.loans, list);
+
+  recordTreasuryAudit({
+    type: "loan",
+    title: `Loan disbursed · ${reason || "Welfare loan"}`,
+    detail: `Member ${memberId} principal ${amount}, interest ${interestPct}%`,
+    amount: Number(amount),
+    memberId,
+    role: "treasurer",
+    date: date || today(),
+  });
+
   return next;
 }
 
@@ -1123,6 +1258,16 @@ export function addLoanRepayment(loanId, amount, date) {
       : l,
   );
   write(KEYS.loans, updated);
+
+  recordTreasuryAudit({
+    type: "loan",
+    title: `Loan repayment recorded`,
+    detail: `${amount} paid against loan ${loanId}`,
+    amount: Number(amount),
+    memberId: loan.memberId,
+    role: "treasurer",
+    date: date || today(),
+  });
 }
 
 export function deleteLoan(id) {
@@ -1399,16 +1544,40 @@ export function updateBankAccount(id, updates) {
   );
 }
 
-export function addBankTxn(id, amount, note) {
+export function addBankTxn(id, amount, note, metadata = {}) {
   const value = Number(amount);
   if (!value) throw new Error("Amount required");
+  const account = getBankAccounts().find((a) => a.id === id);
+  const transactionDate = metadata.date || today();
+  const transaction = {
+    date: transactionDate,
+    amount: value,
+    note: note || "Adjustment",
+    reason: metadata.reason || note || "Adjustment",
+    coSigners: metadata.coSigners || [],
+    receiptName: metadata.receiptName || "",
+    receiptDataUrl: metadata.receiptDataUrl || "",
+  };
   updateBankAccount(id, {
-    balance: (getBankAccounts().find((a) => a.id === id)?.balance || 0) + value,
-    updatedAt: today(),
+    balance: (account?.balance || 0) + value,
+    updatedAt: transactionDate,
     txns: [
-      { date: today(), amount: value, note: note || "Adjustment" },
-      ...(getBankAccounts().find((a) => a.id === id)?.txns || []),
+      transaction,
+      ...(account?.txns || []),
     ],
+  });
+
+  recordTreasuryAudit({
+    type: "bank",
+    title: `Bank movement · ${account?.name || "account"}`,
+    detail: note || "Cash adjustment",
+    amount: Math.abs(value),
+    account: account?.name || id,
+    role: "treasurer",
+    date: transactionDate,
+    coSigners: transaction.coSigners,
+    receiptName: transaction.receiptName,
+    receiptDataUrl: transaction.receiptDataUrl,
   });
 }
 
@@ -1421,17 +1590,40 @@ export function updateMMF(updates) {
   write(KEYS.mmf, { ...getMMF(), ...updates, updatedAt: today() });
 }
 
-export function addMMFTxn(amount, note) {
+export function addMMFTxn(amount, note, metadata = {}) {
   const value = Number(amount);
   if (!value) throw new Error("Amount required");
   const mmf = getMMF();
   const balance = mmf.balance + value;
+  const transactionDate = metadata.date || today();
+  const transaction = {
+    date: transactionDate,
+    amount: value,
+    note: note || "Adjustment",
+    reason: metadata.reason || note || "Adjustment",
+    coSigners: metadata.coSigners || [],
+    receiptName: metadata.receiptName || "",
+    receiptDataUrl: metadata.receiptDataUrl || "",
+  };
   updateMMF({
     balance,
     txns: [
-      { date: today(), amount: value, note: note || "Adjustment" },
+      transaction,
       ...(mmf.txns || []),
     ],
+  });
+
+  recordTreasuryAudit({
+    type: "mmf",
+    title: "Money market movement",
+    detail: note || "Adjustment",
+    amount: Math.abs(value),
+    account: "MMF",
+    role: "treasurer",
+    date: transactionDate,
+    coSigners: transaction.coSigners,
+    receiptName: transaction.receiptName,
+    receiptDataUrl: transaction.receiptDataUrl,
   });
 }
 
@@ -1445,6 +1637,16 @@ export function accrueMMF(pct) {
       { date: today(), amount: interest, note: `Interest accrued at ${rate}%` },
       ...(mmf.txns || []),
     ],
+  });
+
+  recordTreasuryAudit({
+    type: "mmf",
+    title: "MMF interest accrual",
+    detail: `Accrued ${rate}% interest`,
+    amount: Math.abs(interest),
+    account: "MMF",
+    role: "treasurer",
+    date: today(),
   });
 }
 
@@ -1468,7 +1670,7 @@ export function backupAll() {
     "members", "accounts", "history", "fees", "investments",
     "documents", "minutes", "savingsRecord", "config", "meetings",
     "fines", "loans", "withdrawals", "transactions", "banks", "mmf",
-    "announcements", "actionItems", "subCommittees", "events", "statements",
+    "announcements", "actionItems", "subCommittees", "events", "statements", "treasuryAudit",
   ];
   const data = {};
   keys.forEach((key) => {

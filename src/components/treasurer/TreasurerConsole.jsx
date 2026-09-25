@@ -34,6 +34,8 @@ import {
   getUnpaidTotals,
   getPoolStats,
   getContributionTotalsByMonth,
+  getTreasuryAuditLog,
+  getCashPosition,
   KES,
 } from "../../lib/store";
 import BackToLogin from "../BackToLogin";
@@ -150,6 +152,7 @@ export default function TreasurerConsole({ session, onLogout }) {
     { key: "ledger", label: "Savings ledger", icon: TableIcon },
     { key: "finesloans", label: "Fines & loans", icon: HandCoins },
     { key: "withdrawals", label: "Withdrawals", icon: ArrowUpRight },
+    { key: "reconcile", label: "Reconciliation", icon: FileText },
     { key: "settings", label: "Group settings", icon: Settings },
     { key: "documents", label: "Documents", icon: FileText },
   ];
@@ -249,6 +252,7 @@ export default function TreasurerConsole({ session, onLogout }) {
               <CashPosition onChanged={() => setRefresh((n) => n + 1)} />
             </div>
             <Overview poolYearly={poolYearly} />
+            <TreasuryAudit onChanged={refresh} />
             <div className="mt-10">
               <RoleMandate roleKey="treasurer" holder={ownMember} />
             </div>
@@ -262,8 +266,12 @@ export default function TreasurerConsole({ session, onLogout }) {
           <FinesLoansTab onChanged={() => setRefresh((n) => n + 1)} />
         )}
         {tab === "withdrawals" && (
-          <WithdrawalsTab onChanged={() => setRefresh((n) => n + 1)} />
+          <WithdrawalsTab
+            session={session}
+            onChanged={() => setRefresh((n) => n + 1)}
+          />
         )}
+        {tab === "reconcile" && <ReconciliationReport />}
         {tab === "settings" && (
           <div className="mt-8">
             <SettingsPanel
@@ -542,6 +550,210 @@ function Overview({ poolYearly }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+function TreasuryAudit({ onChanged }) {
+  const entries = useMemo(() => getTreasuryAuditLog(), [onChanged]);
+
+  return (
+    <Card
+      icon={FileText}
+      title="Treasury reconciliation trail"
+      subtitle="Latest financial movements, approvals, statements and member account changes"
+    >
+      <div className="space-y-3">
+        {entries.length === 0 ? (
+          <p className="rounded-2xl bg-sand px-5 py-8 text-center text-sm text-navy/50">
+            No treasury activity recorded yet.
+          </p>
+        ) : (
+          entries.slice(0, 8).map((entry) => (
+            <div key={entry.id} className="flex flex-col gap-2 rounded-2xl bg-sand p-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-semibold text-navy">{entry.title}</p>
+                <p className="mt-1 text-xs text-navy/60">{entry.detail || "No additional details"}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 text-right">
+                {entry.amount ? (
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-navy">
+                    {KES(entry.amount)}
+                  </span>
+                ) : null}
+                <span className="text-[11px] text-navy/45">{entry.date}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function ReconciliationReport() {
+  const entries = useMemo(() => getTreasuryAuditLog(), []);
+  const cash = useMemo(() => getCashPosition(), []);
+  const [range, setRange] = useState("all");
+
+  const filtered = useMemo(() => {
+    if (range === "all") return entries;
+    const days = Number(range) || 7;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return entries.filter((entry) => new Date(entry.createdAt || entry.date) >= cutoff);
+  }, [entries, range]);
+
+  const grouped = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((entry) => {
+      const dateKey = entry.date || entry.createdAt?.slice(0, 10) || "Unknown";
+      const arr = map.get(dateKey) || [];
+      arr.push(entry);
+      map.set(dateKey, arr);
+    });
+    return Array.from(map.entries()).sort((a, b) => String(b[0]).localeCompare(String(a[0])));
+  }, [filtered]);
+
+  const totals = useMemo(() => {
+    const summary = { bank: 0, mmf: 0, other: 0 };
+    filtered.forEach((entry) => {
+      if (!entry.amount) return;
+      if (entry.type === "bank") summary.bank += Number(entry.amount || 0);
+      else if (entry.type === "mmf") summary.mmf += Number(entry.amount || 0);
+      else summary.other += Number(entry.amount || 0);
+    });
+    return summary;
+  }, [filtered]);
+
+  function exportCsv() {
+    const rows = [
+      ["Date", "Type", "Title", "Detail", "Amount", "Account", "Co-signers", "Receipt", "Role"],
+      ...filtered.map((entry) => [
+        entry.date || entry.createdAt?.slice(0, 10) || "",
+        entry.type || "",
+        entry.title || "",
+        entry.detail || "",
+        Number(entry.amount || 0),
+        entry.account || "",
+        (entry.coSigners || []).join("; "),
+        entry.receiptName || "",
+        entry.role || "",
+      ]),
+    ];
+
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `treasury-reconciliation-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className="mt-8 rounded-3xl bg-white p-6 shadow-xl sm:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-serif text-xl font-bold text-navy">Treasury reconciliation report</h2>
+          <p className="mt-1 text-sm text-navy/60">
+            Cash and transaction movements by date, with a summary of the latest treasury trail.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="rounded-xl border border-navy/10 bg-sand px-3 py-2 text-sm text-navy outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+          >
+            <option value="all">All time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-navy-light"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl bg-sand p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-navy/50">Bank movements</p>
+          <p className="mt-1.5 font-serif text-2xl font-bold text-blue-700">{KES(totals.bank)}</p>
+        </div>
+        <div className="rounded-2xl bg-sand p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-navy/50">MMF movements</p>
+          <p className="mt-1.5 font-serif text-2xl font-bold text-green">{KES(totals.mmf)}</p>
+        </div>
+        <div className="rounded-2xl bg-sand p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-navy/50">Other activity</p>
+          <p className="mt-1.5 font-serif text-2xl font-bold text-navy">{KES(totals.other)}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl bg-sand p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-navy/50">Current position</p>
+          <div className="mt-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between"><span>Bank</span><strong>{KES(cash.bank)}</strong></div>
+            <div className="flex items-center justify-between"><span>MMF</span><strong>{KES(cash.mmf)}</strong></div>
+            <div className="flex items-center justify-between"><span>Liquid</span><strong>{KES(cash.liquid)}</strong></div>
+            <div className="flex items-center justify-between"><span>Invested</span><strong>{KES(cash.invested)}</strong></div>
+          </div>
+        </div>
+        <div className="rounded-2xl bg-sand p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-navy/50">Activity snapshot</p>
+          <div className="mt-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between"><span>Entries</span><strong>{filtered.length}</strong></div>
+            <div className="flex items-center justify-between"><span>Dates covered</span><strong>{grouped.length}</strong></div>
+            <div className="flex items-center justify-between"><span>Latest date</span><strong>{filtered[0]?.date || "—"}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 space-y-4">
+        {grouped.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-navy/20 px-5 py-10 text-center text-sm text-navy/50">
+            No reconciliation entries for the selected period.
+          </p>
+        ) : (
+          grouped.map(([dateKey, dayEntries]) => (
+            <div key={dateKey} className="rounded-2xl border border-navy/10 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="font-serif text-lg font-bold text-navy">{dateKey}</p>
+                <span className="rounded-full bg-navy/5 px-2.5 py-1 text-[11px] font-semibold text-navy">
+                  {dayEntries.length} events
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {dayEntries.map((entry) => (
+                  <div key={entry.id} className="flex flex-col gap-2 rounded-xl bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-navy">{entry.title}</p>
+                      <p className="text-xs text-navy/60">{entry.detail || "No additional details"}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 text-right">
+                      {entry.amount ? (
+                        <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-navy">
+                          {KES(entry.amount)}
+                        </span>
+                      ) : null}
+                      <span className="text-[11px] font-medium text-navy/50">{entry.type}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 

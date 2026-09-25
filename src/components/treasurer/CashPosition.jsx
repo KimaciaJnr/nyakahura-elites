@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Landmark,
   TrendingUp,
@@ -48,7 +48,7 @@ function TxnList({ txns, title }) {
         {(txns || []).slice(0, 8).map((t, i) => (
           <li key={i} className="flex items-center justify-between gap-3 text-sm">
             <span className="min-w-0 truncate text-navy/70">
-              {t.date} · {t.note}
+              {t.date} · {t.reason || t.note}
             </span>
             <span
               className={`shrink-0 font-semibold ${
@@ -64,6 +64,12 @@ function TxnList({ txns, title }) {
           <li className="text-sm text-navy/40">No movements yet.</li>
         )}
       </ul>
+      {(txns || []).slice(0, 8).map((t, i) => (
+        <div key={`details-${i}`} className="mt-1 text-[11px] text-navy/45">
+          {t.coSigners?.length ? `Co-signed by: ${t.coSigners.join(", ")}` : "No co-signers listed"}
+          {t.receiptName ? ` · Receipt: ${t.receiptName}` : " · No receipt attached"}
+        </div>
+      ))}
     </div>
   );
 }
@@ -77,19 +83,80 @@ export default function CashPosition({ onChanged }) {
   const [action, setAction] = useState("deposit");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [coSigners, setCoSigners] = useState("");
+  const [receipt, setReceipt] = useState(null);
   const [rate, setRate] = useState("2.0");
   const [msg, setMsg] = useState("");
+  const receiptRef = useRef(null);
 
   const isMmf = target === "mmf";
   const current = isMmf ? mmf : banks.find((b) => b.id === target);
 
-  function run(actionFn, value, label) {
+  async function run(actionFn, value, label) {
     try {
-      actionFn(value, label);
-      setMsg(`${action === "deposit" ? "Deposited" : "Withdrawn"} ${KES(value)} to ${current?.name}.`);
+      const signedValue = Number(value) || 0;
+      if (!signedValue) throw new Error("Amount required");
+      if (!note.trim()) throw new Error("Reason required");
+      if (!transactionDate) throw new Error("Transaction date required");
+      if (!coSigners.trim()) throw new Error("List at least one co-signer");
+      if (!receipt) throw new Error("Transaction receipt or confirmation required");
+
+      const receiptDataUrl = await readReceipt(receipt);
+      const metadata = {
+        date: transactionDate,
+        reason: note.trim(),
+        coSigners: coSigners.split(",").map((name) => name.trim()).filter(Boolean),
+        receiptName: receipt.name,
+        receiptDataUrl,
+      };
+
+      if (signedValue < 0) {
+        const balance = isMmf ? mmf.balance : current?.balance || 0;
+        if (Math.abs(signedValue) > balance) {
+          throw new Error(`Insufficient funds in ${current?.name || "the selected account"}.`);
+        }
+      }
+
+      actionFn(value, label, metadata);
+      setMsg(`${action === "deposit" ? "Deposited" : "Withdrawn"} ${KES(Math.abs(signedValue))} from ${current?.name}.`);
       setAmount("");
       setNote("");
+      setTransactionDate(new Date().toISOString().slice(0, 10));
+      setCoSigners("");
+      setReceipt(null);
+      if (receiptRef.current) receiptRef.current.value = "";
       onChanged();
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+
+  function readReceipt(file) {
+    return new Promise((resolve, reject) => {
+      if (file.size > 2_500_000) {
+        reject(new Error("Receipt is too large (max 2.5 MB)."));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Unable to read receipt file."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function handleReceiptPick(event) {
+    setReceipt(event.target.files?.[0] || null);
+  }
+
+  async function recordBankMovement() {
+    const value = action === "deposit" ? Number(amount) : -Number(amount);
+    try {
+      if (!Number.isFinite(value) || value === 0) throw new Error("Amount required");
+      if (value < 0 && (current?.balance || 0) + value < 0) {
+        throw new Error(`Insufficient funds in ${current?.name || "the selected account"}.`);
+      }
+      await run(addBankTxn, value, note || "Cash adjustment");
     } catch (e) {
       setMsg(e.message);
     }
@@ -148,7 +215,7 @@ export default function CashPosition({ onChanged }) {
             <div>
               <h3 className="font-serif text-lg font-bold text-navy">Cash movements</h3>
               <p className="text-sm text-navy/60">
-                Record deposits and withdrawals for bank or the KCB Money Market Fund.
+                Record completed movements with their reason, co-signers and supporting receipt.
               </p>
             </div>
           </div>
@@ -206,22 +273,48 @@ export default function CashPosition({ onChanged }) {
               </label>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy/50">Transaction date</span>
+                <input
+                  type="date"
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  className={`${inputCls} mt-1.5`}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy/50">Co-signers</span>
+                <input
+                  value={coSigners}
+                  onChange={(e) => setCoSigners(e.target.value)}
+                  placeholder="Names, separated by commas"
+                  className={`${inputCls} mt-1.5`}
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-2xl bg-sand p-4 sm:flex-row sm:items-center sm:justify-between">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-navy ring-1 ring-navy/10 hover:bg-navy/5">
+                <ArrowDownLeft className="h-4 w-4" />
+                Upload receipt / confirmation
+                <input
+                  ref={receiptRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={handleReceiptPick}
+                />
+              </label>
+              <span className="text-xs text-navy/60">{receipt?.name || "Required evidence"}</span>
+            </div>
+
             <button
               onClick={() => {
                 if (isMmf) {
                   run(addMMFTxn, action === "deposit" ? Number(amount) : -Number(amount), note || (action === "deposit" ? "Deposit to MMF" : "Withdrawal from MMF"));
                 } else {
-                  const value = action === "deposit" ? Number(amount) : -Number(amount);
-                  try {
-                    if (!value) throw new Error("Amount required");
-                    addBankTxn(target, value, note || "Cash adjustment");
-                    setMsg(`${action === "deposit" ? "Deposited" : "Withdrawn"} ${KES(Math.abs(value))} from ${current?.name}.`);
-                    setAmount("");
-                    setNote("");
-                    onChanged();
-                  } catch (e) {
-                    setMsg(e.message);
-                  }
+                  recordBankMovement();
                 }
               }}
               disabled={!Number(amount)}

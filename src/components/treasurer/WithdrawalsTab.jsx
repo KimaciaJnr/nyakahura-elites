@@ -15,13 +15,14 @@ const REQUIRED_APPROVERS = [
   { key: "treasurer", label: "Treasurer" },
 ];
 
-export default function WithdrawalsTab({ onChanged }) {
+export default function WithdrawalsTab({ session, onChanged }) {
   const [form, setForm] = useState({
     title: "",
     amount: "",
     reason: "",
     date: "",
     bankRef: "",
+    coSigners: "",
     evidence: null,
   });
   const [notice, setNotice] = useState("");
@@ -34,6 +35,8 @@ export default function WithdrawalsTab({ onChanged }) {
   async function submit() {
     try {
       const file = form.evidence;
+      if (!file) throw new Error("Transaction receipt or confirmation is required.");
+      if (!form.coSigners.trim()) throw new Error("List at least one co-signer.");
       let evidenceDataUrl = "";
 
       if (file) {
@@ -51,6 +54,7 @@ export default function WithdrawalsTab({ onChanged }) {
         date: form.date || undefined,
         reason: form.reason,
         bankRef: form.bankRef,
+        coSigners: form.coSigners.split(",").map((name) => name.trim()).filter(Boolean),
         evidenceName: file ? file.name : "",
         evidenceDataUrl,
         recordedBy: "Treasurer",
@@ -58,7 +62,7 @@ export default function WithdrawalsTab({ onChanged }) {
       });
 
       setNotice("");
-      setForm({ title: "", amount: "", reason: "", date: "", bankRef: "", evidence: null });
+      setForm({ title: "", amount: "", reason: "", date: "", bankRef: "", coSigners: "", evidence: null });
       setUploadName("");
       if (fileRef.current) {
         fileRef.current.value = "";
@@ -77,7 +81,9 @@ export default function WithdrawalsTab({ onChanged }) {
 
   function handleApproval(transactionId, roleKey, roleLabel) {
     try {
-      approveOfficialTransaction(transactionId, roleKey, roleLabel);
+      const actorRole = session?.role || roleKey;
+      const approverName = session?.name || roleLabel;
+      approveOfficialTransaction(transactionId, roleKey, approverName, actorRole);
       setNotice("");
       onChanged();
     } catch (error) {
@@ -137,6 +143,13 @@ export default function WithdrawalsTab({ onChanged }) {
             placeholder="Bank ref / transfer ref"
             className="rounded-xl border border-navy/10 py-3 px-4 text-sm text-navy outline-none placeholder:text-navy/40 focus:border-navy focus:ring-2 focus:ring-navy/10"
           />
+          <input
+            type="text"
+            value={form.coSigners}
+            onChange={(event) => setForm({ ...form, coSigners: event.target.value })}
+            placeholder="Co-signers (names separated by commas)"
+            className="rounded-xl border border-navy/10 py-3 px-4 text-sm text-navy outline-none placeholder:text-navy/40 focus:border-navy focus:ring-2 focus:ring-navy/10 sm:col-span-2 lg:col-span-3"
+          />
         </div>
 
         <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-sand p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -151,7 +164,7 @@ export default function WithdrawalsTab({ onChanged }) {
               onChange={handleEvidencePick}
             />
           </label>
-          <span className="text-xs text-navy/60">{uploadName || "No receipt uploaded yet"}</span>
+          <span className="text-xs text-navy/60">{uploadName || "Required evidence"}</span>
         </div>
 
         {notice && (
@@ -163,7 +176,7 @@ export default function WithdrawalsTab({ onChanged }) {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             onClick={submit}
-            disabled={!form.title || !form.amount}
+            disabled={!form.title || !form.amount || !form.coSigners || !form.evidence}
             className="inline-flex items-center gap-2 rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-light disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowUpRight className="h-4 w-4" />
@@ -211,6 +224,9 @@ export default function WithdrawalsTab({ onChanged }) {
                     <p className="text-xs text-navy/50">
                       {transaction.date} · {transaction.bankRef || "No bank ref"}
                     </p>
+                    <p className="mt-1 text-xs text-navy/60">
+                      {transaction.reason || "No reason recorded"} · Co-signed by: {(transaction.coSigners || []).join(", ") || "Not listed"}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-serif text-2xl font-bold text-navy">{KES(transaction.amount)}</p>
@@ -254,16 +270,20 @@ export default function WithdrawalsTab({ onChanged }) {
 
                 {missing.length > 0 && (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {missing.map((role) => (
-                      <button
-                        key={role.key}
-                        type="button"
-                        onClick={() => handleApproval(transaction.id, role.key, role.label)}
-                        className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-light"
-                      >
-                        Approve as {role.label}
-                      </button>
-                    ))}
+                    {missing.map((role) => {
+                      const isCurrentApprover = session?.role === role.key;
+                      return (
+                        <button
+                          key={role.key}
+                          type="button"
+                          disabled={!isCurrentApprover}
+                          onClick={() => handleApproval(transaction.id, role.key, role.label)}
+                          className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-light disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isCurrentApprover ? `Approve as ${role.label}` : `${role.label} approval pending`}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

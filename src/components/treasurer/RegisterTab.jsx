@@ -131,6 +131,10 @@ export default function RegisterTab({ onChanged }) {
   function publish() {
     if (!preview) return;
     try {
+      if (preview.unmatched && preview.unmatched.length > 0) {
+        throw new Error("Resolve all unmatched rows before publishing this statement.");
+      }
+
       saveContributionStatement({
         month,
         fileName: preview.fileName,
@@ -418,7 +422,8 @@ export default function RegisterTab({ onChanged }) {
               <button
                 type="button"
                 onClick={publish}
-                className="inline-flex items-center gap-1.5 rounded-full bg-green px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-green/90"
+                disabled={preview.unmatched.length > 0}
+                className="inline-flex items-center gap-1.5 rounded-full bg-green px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-green/90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Upload className="h-4 w-4" />
                 Publish statement
