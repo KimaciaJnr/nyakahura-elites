@@ -1,22 +1,11 @@
 ﻿import { useMemo, useRef, useState } from "react";
-import { ArrowUpRight, CheckCircle2, Clock3, HandCoins, Upload, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, HandCoins, Upload, Wallet } from "lucide-react";
 
-import {
-  KES,
-  addOfficialTransaction,
-  approveOfficialTransaction,
-  getPendingOfficialTransactions,
-  getWithdrawals,
-} from "../../lib/store";
+import { KES, addOfficialTransaction, getWithdrawals } from "../../lib/store";
 
-const REQUIRED_APPROVERS = [
-  { key: "chairperson", label: "Chairperson" },
-  { key: "vicechairperson", label: "Vice Chairperson" },
-  { key: "treasurer", label: "Treasurer" },
-];
-
-export default function WithdrawalsTab({ session, onChanged }) {
-  const [form, setForm] = useState({
+export default function WithdrawalsTab({ onChanged }) {
+  const [form, setForm] = useState(() => ({
+    type: "withdrawal",
     title: "",
     amount: "",
     reason: "",
@@ -24,17 +13,18 @@ export default function WithdrawalsTab({ session, onChanged }) {
     bankRef: "",
     coSigners: "",
     evidence: null,
-  });
+  }));
   const [notice, setNotice] = useState("");
   const [uploadName, setUploadName] = useState("");
   const fileRef = useRef(null);
+  const isDeposit = form.type === "deposit";
 
-  const withdrawals = useMemo(() => getWithdrawals(), [onChanged]);
-  const pending = useMemo(() => getPendingOfficialTransactions(), [onChanged]);
+  const transactions = useMemo(() => getWithdrawals(), [onChanged]);
 
   async function submit() {
     try {
       const file = form.evidence;
+      const transactionType = form.type === "deposit" ? "deposit" : "withdrawal";
       if (!file) throw new Error("Transaction receipt or confirmation is required.");
       if (!form.coSigners.trim()) throw new Error("List at least one co-signer.");
       let evidenceDataUrl = "";
@@ -49,6 +39,7 @@ export default function WithdrawalsTab({ session, onChanged }) {
       }
 
       addOfficialTransaction({
+        type: transactionType,
         title: form.title,
         amount: form.amount,
         date: form.date || undefined,
@@ -58,11 +49,10 @@ export default function WithdrawalsTab({ session, onChanged }) {
         evidenceName: file ? file.name : "",
         evidenceDataUrl,
         recordedBy: "Treasurer",
-        requiredApprovers: REQUIRED_APPROVERS.map((role) => role.key),
       });
 
       setNotice("");
-      setForm({ title: "", amount: "", reason: "", date: "", bankRef: "", coSigners: "", evidence: null });
+      setForm({ type: transactionType, title: "", amount: "", reason: "", date: "", bankRef: "", coSigners: "", evidence: null });
       setUploadName("");
       if (fileRef.current) {
         fileRef.current.value = "";
@@ -79,18 +69,6 @@ export default function WithdrawalsTab({ session, onChanged }) {
     setUploadName(nextFile ? nextFile.name : "");
   }
 
-  function handleApproval(transactionId, roleKey, roleLabel) {
-    try {
-      const actorRole = session?.role || roleKey;
-      const approverName = session?.name || roleLabel;
-      approveOfficialTransaction(transactionId, roleKey, approverName, actorRole);
-      setNotice("");
-      onChanged();
-    } catch (error) {
-      setNotice(error.message || "Approval failed.");
-    }
-  }
-
   return (
     <div className="mt-8 space-y-6">
       <section className="rounded-3xl bg-white p-6 shadow-xl sm:p-8">
@@ -100,11 +78,39 @@ export default function WithdrawalsTab({ session, onChanged }) {
           </div>
           <div>
             <h2 className="font-serif text-lg font-bold text-navy">
-              Record a group withdrawal / transaction
+              Record a group {isDeposit ? "deposit" : "withdrawal"}
             </h2>
             <p className="text-sm text-navy/60">
-              Withdrawals are only recorded for official group transactions. A transaction stays pending until all required approving officials sign off and the receipt is logged.
+              Choose the transaction type below. Record the co-signers and receipt with the transaction.
             </p>
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <p className="text-xs font-bold uppercase tracking-wider text-navy/50">Transaction type</p>
+          <div className="mt-2 grid max-w-md grid-cols-2 gap-1 rounded-2xl bg-sand p-1.5" role="group" aria-label="Transaction type">
+            <button
+              type="button"
+              aria-pressed={isDeposit}
+              onClick={() => setForm((prev) => ({ ...prev, type: "deposit" }))}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                isDeposit ? "bg-green text-white" : "text-navy/60 hover:bg-white"
+              }`}
+            >
+              <ArrowDownLeft className="h-4 w-4" />
+              Deposit
+            </button>
+            <button
+              type="button"
+              aria-pressed={!isDeposit}
+              onClick={() => setForm((prev) => ({ ...prev, type: "withdrawal" }))}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                isDeposit ? "text-navy/60 hover:bg-white" : "bg-navy text-white"
+              }`}
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              Withdrawal
+            </button>
           </div>
         </div>
 
@@ -175,16 +181,14 @@ export default function WithdrawalsTab({ session, onChanged }) {
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
+            type="button"
             onClick={submit}
             disabled={!form.title || !form.amount || !form.coSigners || !form.evidence}
             className="inline-flex items-center gap-2 rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-light disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <ArrowUpRight className="h-4 w-4" />
-            Log transaction
+            {isDeposit ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+            {isDeposit ? "Log deposit" : "Log withdrawal"}
           </button>
-          <span className="rounded-full bg-gold/15 px-3 py-1.5 text-xs font-semibold text-gold-dark">
-            3 approval checks required: Chairperson, Vice Chairperson, Treasurer
-          </span>
         </div>
       </section>
 
@@ -195,26 +199,17 @@ export default function WithdrawalsTab({ session, onChanged }) {
           </div>
           <div>
             <h2 className="font-serif text-lg font-bold text-navy">
-              Transaction ledger ({withdrawals.length})
+              Transaction ledger ({transactions.length})
             </h2>
             <p className="text-sm text-navy/60">
-              Each transaction is visible to the executive and remains pending until all necessary approvals are recorded.
+              Each transaction is visible in the ledger with its co-signers and receipt details.
             </p>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-            Pending approvals: {pending.length}
-          </span>
-        </div>
-
         <div className="mt-4 space-y-4">
-          {withdrawals.map((transaction) => {
-            const missing = REQUIRED_APPROVERS.filter(
-              (role) => !(transaction.approvals || {})[role.key],
-            );
-            const isPending = transaction.status !== "approved";
+          {transactions.map((transaction) => {
+            const transactionIsDeposit = transaction.type === "deposit";
 
             return (
               <div key={transaction.id} className="rounded-2xl border border-navy/10 bg-sand p-4">
@@ -229,32 +224,20 @@ export default function WithdrawalsTab({ session, onChanged }) {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-serif text-2xl font-bold text-navy">{KES(transaction.amount)}</p>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                        isPending ? "bg-amber-100 text-amber-700" : "bg-green/10 text-green"
-                      }`}
-                    >
-                      {isPending ? <Clock3 className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                      {isPending ? "Pending approval" : "Approved"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  {REQUIRED_APPROVERS.map((role) => {
-                    const approvedRole = (transaction.approvals || {})[role.key];
-                    return (
+                    <p className={`font-serif text-2xl font-bold ${transactionIsDeposit ? "text-green" : "text-red-500"}`}>
+                      {transactionIsDeposit ? "+" : "-"} {KES(transaction.amount)}
+                    </p>
+                    <div className="mt-2 flex flex-wrap justify-end gap-2">
                       <span
-                        key={role.key}
-                        className={`rounded-full px-2.5 py-1 font-semibold ${
-                          approvedRole ? "bg-green/10 text-green" : "bg-white text-navy/60"
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          transactionIsDeposit ? "bg-green/10 text-green" : "bg-red-100 text-red-600"
                         }`}
                       >
-                        {role.label}: {approvedRole ? "Approved" : "Waiting"}
+                        {transactionIsDeposit ? <ArrowDownLeft className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                        {transactionIsDeposit ? "Deposit" : "Withdrawal"}
                       </span>
-                    );
-                  })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-3 text-sm text-navy/70">
@@ -268,25 +251,6 @@ export default function WithdrawalsTab({ session, onChanged }) {
                   )}
                 </div>
 
-                {missing.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {missing.map((role) => {
-                      const isCurrentApprover = session?.role === role.key;
-                      return (
-                        <button
-                          key={role.key}
-                          type="button"
-                          disabled={!isCurrentApprover}
-                          onClick={() => handleApproval(transaction.id, role.key, role.label)}
-                          className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-light disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {isCurrentApprover ? `Approve as ${role.label}` : `${role.label} approval pending`}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
                 {transaction.recordedBy && (
                   <p className="mt-3 text-xs text-navy/50">Recorded by: {transaction.recordedBy}</p>
                 )}
@@ -294,7 +258,7 @@ export default function WithdrawalsTab({ session, onChanged }) {
             );
           })}
 
-          {withdrawals.length === 0 && (
+          {transactions.length === 0 && (
             <div className="rounded-2xl border border-dashed border-navy/20 bg-white px-5 py-10 text-center text-sm text-navy/50">
               No official transactions logged yet.
             </div>

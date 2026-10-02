@@ -591,8 +591,13 @@ export default function AccountDashboard({ session, onLogout }) {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-5 md:grid-cols-3">
-            {investments.map((inv) => {
+          {investments.length === 0 ? (
+            <p className="mt-6 rounded-2xl border border-dashed border-navy/15 px-5 py-8 text-center text-sm text-navy/50">
+              No external investments recorded. Funds are held in cash or the MMF.
+            </p>
+          ) : (
+            <div className="mt-6 grid gap-5 md:grid-cols-3">
+              {investments.map((inv) => {
               const Icon = CATEGORY_ICONS[inv.category] || TrendingUp;
               const gain = inv.currentValue - inv.amount;
               const gainPct = ((gain / inv.amount) * 100).toFixed(1);
@@ -642,7 +647,8 @@ export default function AccountDashboard({ session, onLogout }) {
                 </article>
               );
             })}
-          </div>
+            </div>
+          )}
         </section>
 
         <section className="mt-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-navy/5 sm:p-8">

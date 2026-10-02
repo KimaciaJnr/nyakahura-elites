@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Megaphone,
   Wallet,
+  Users,
   MapPin,
   Clock,
   CheckCircle2,
@@ -27,6 +28,7 @@ import RoleMandate from "../RoleMandate";
 import useTabNavigation from "../../lib/useTabNavigation";
 import AnnouncementsTab from "../secretary/AnnouncementsTab";
 import FinancesMembers from "./FinancesMembers";
+import MemberDirectory from "./MemberDirectory";
 
 function fmtDate(d) {
   const date = new Date(d + "T00:00:00");
@@ -45,6 +47,7 @@ function KES(n) {
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
   { key: "finances", label: "Finances & members", icon: Wallet },
+  { key: "directory", label: "Member directory", icon: Users },
   { key: "minutes", label: "Minutes & approvals", icon: Stamp },
   { key: "meetings", label: "Meetings", icon: CalendarDays },
   { key: "announcements", label: "Announcements", icon: Megaphone },
@@ -191,6 +194,8 @@ export default function ChairpersonConsole({ session, onLogout }) {
         {tab === "finances" && (
           <FinancesMembers onChanged={() => setRefresh((n) => n + 1)} />
         )}
+
+        {tab === "directory" && <MemberDirectory />}
 
         {tab === "minutes" && (
           <div className="space-y-4">

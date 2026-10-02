@@ -117,11 +117,11 @@ export default function MinutesForm({ minutes, onCancel, onSaved }) {
 
     if (editing) {
       updateMinutes(minutes.id, data);
-      setSuccess("Minutes updated.");
+      setSuccess("Minutes updated. Fines for any unexcused absences were applied automatically.");
       onSaved(minutes.id);
     } else {
       const saved = addMinutes(data);
-      setSuccess("Minutes saved as draft.");
+      setSuccess("Minutes saved as draft. Fines for any unexcused absences were applied automatically.");
       onSaved(saved.id);
     }
   }
@@ -270,7 +270,7 @@ export default function MinutesForm({ minutes, onCancel, onSaved }) {
         <div>
           <h3 className="font-serif text-lg font-bold text-navy">Attendance</h3>
           <p className="mt-1 text-sm text-navy/60">
-            One name per line.
+            One name per line. Fines for unexcused absences are applied automatically when minutes are saved.
           </p>
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <div>

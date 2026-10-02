@@ -15,6 +15,7 @@ import {
   SEED_ACTION_ITEMS,
   SEED_EVENTS,
   MEMBER_CONTACTS_BY_NO,
+  MEMBER_NAME_ALIASES,
 } from "../data/seed";
 
 const KEYS = {
@@ -36,6 +37,7 @@ const KEYS = {
   transactions: "neh_official_transactions",
   banks: "neh_banks",
   mmf: "neh_mmf",
+  treasuryPositionVersion: "neh_treasury_position_version",
   announcements: "neh_announcements",
   actionItems: "neh_action_items",
   statements: "neh_contribution_statements",
@@ -46,6 +48,10 @@ const KEYS = {
 
 const SEED_VERSION = "2026-09-organising-secretary-710";
 const CONTRIBUTION_RECORD_VERSION = "2026-09-uploaded-record-2";
+const TREASURY_POSITION_VERSION = "2026-09-mmf-cash-300000-investments-0";
+const TARGET_MMF_BALANCE = 300000;
+const TARGET_MMF_DATE = "2026-07-05";
+const TARGET_MMF_NOTE = "Cash deposited into KCB Money Market Fund";
 
 function read(key, fallback) {
   try {
@@ -61,6 +67,61 @@ function read(key, fallback) {
 
 function write(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+}
+
+function migrateTreasuryPosition() {
+  if (localStorage.getItem(KEYS.treasuryPositionVersion) === TREASURY_POSITION_VERSION) return;
+
+  const mmf = read(KEYS.mmf, null);
+  if (mmf && typeof mmf === "object" && !Array.isArray(mmf)) {
+    const txns = Array.isArray(mmf.txns) ? mmf.txns : [];
+    const isLegacyDeposit = txns.some(
+      (txn) =>
+        txn?.date === TARGET_MMF_DATE &&
+        (txn?.amount === 50000 || txn?.note === "Initial investment (per MIN.07/AGM/2025)"),
+    );
+
+    if (Number(mmf.balance) === 50000 || isLegacyDeposit) {
+      const unitPrice = Number(mmf.unitPrice) || SEED_MMF.unitPrice;
+      const migratedTxns = txns.length
+        ? txns.map((txn) =>
+            txn?.date === TARGET_MMF_DATE &&
+            (txn?.amount === 50000 || txn?.note === "Initial investment (per MIN.07/AGM/2025)")
+              ? { ...txn, amount: TARGET_MMF_BALANCE, note: TARGET_MMF_NOTE }
+              : txn,
+          )
+        : [{ date: TARGET_MMF_DATE, amount: TARGET_MMF_BALANCE, note: TARGET_MMF_NOTE }];
+
+      write(KEYS.mmf, {
+        ...mmf,
+        balance: TARGET_MMF_BALANCE,
+        unitPrice,
+        shares: Number((TARGET_MMF_BALANCE / unitPrice).toFixed(2)),
+        txns: migratedTxns,
+        updatedAt: today(),
+      });
+    }
+  }
+
+  const banks = read(KEYS.banks, []);
+  if (Array.isArray(banks) && banks.length) {
+    write(
+      KEYS.banks,
+      banks.map((bank) => ({
+        ...bank,
+        txns: (Array.isArray(bank.txns) ? bank.txns : []).map((txn) =>
+          txn?.date === TARGET_MMF_DATE &&
+          txn?.amount === -50000 &&
+          txn?.note === "Transfer to KCB Money Market Fund"
+            ? { ...txn, amount: -TARGET_MMF_BALANCE }
+            : txn,
+        ),
+      })),
+    );
+  }
+
+  write(KEYS.investments, []);
+  localStorage.setItem(KEYS.treasuryPositionVersion, TREASURY_POSITION_VERSION);
 }
 
 function seed() {
@@ -109,7 +170,7 @@ function initStore() {
   localStorage.removeItem("neh_handovers");
 
   // Apply authoritative contact updates to existing browser data without
-  // resetting locally recorded transactions, approvals, or documents.
+  // resetting locally recorded transactions or documents.
   const members = read(KEYS.members, []);
   const updated = members.map((member) => {
     const contact = MEMBER_CONTACTS_BY_NO[member.memberNo];
@@ -133,6 +194,8 @@ function initStore() {
     write(KEYS.savingsRecord, canonical.savingsRecord);
     localStorage.setItem("neh_contribution_record_version", CONTRIBUTION_RECORD_VERSION);
   }
+
+  migrateTreasuryPosition();
 }
 
 initStore();
@@ -145,6 +208,10 @@ export function getMembers() {
 
 export function getActiveMembers() {
   return getMembers().filter((m) => m.role === "member" && m.status !== "frozen");
+}
+
+export function getMemberNameAliases() {
+  return { ...MEMBER_NAME_ALIASES };
 }
 
 export function getAccounts() {
@@ -418,6 +485,88 @@ export function getMinutesById(id) {
   return read(KEYS.minutes, []).find((m) => m.id === id) || null;
 }
 
+function syncAttendanceFines({
+  date,
+  absentWithoutApology,
+  priorRecords,
+  meetingId = null,
+  minutesId = null,
+}) {
+  const absent = Array.isArray(absentWithoutApology) ? absentWithoutApology : [];
+  const memberIdByName = Object.fromEntries(
+    getMembers()
+      .filter((member) => member.role === "member")
+      .map((member) => [member.name, member.id]),
+  );
+  const absentMemberIds = new Set(
+    absent.map((name) => memberIdByName[name]).filter(Boolean),
+  );
+  const sourceMatches = (fine) =>
+    (meetingId && fine.meetingId === meetingId) ||
+    (minutesId && fine.minutesId === minutesId);
+  const existing = getFinesLog();
+  const retained = existing.filter((fine) => {
+    if (fine.type !== "meeting" || fine.status !== "unpaid" || !sourceMatches(fine)) {
+      return true;
+    }
+    return absentMemberIds.has(fine.memberId) && fine.date === date;
+  });
+  if (retained.length !== existing.length) write(KEYS.fines, retained);
+
+  const fines = getFinesLog();
+  const cfg = getConfig();
+  let created = 0;
+  absent.forEach((name) => {
+    const memberId = memberIdByName[name];
+    if (!memberId) return;
+    const label = `Missed meeting fine — ${date} (${name})`;
+    const alreadyFined = fines.some(
+      (fine) =>
+        fine.type === "meeting" &&
+        fine.memberId === memberId &&
+        (sourceMatches(fine) || (fine.date === date && fine.label === label)),
+    );
+    if (alreadyFined) return;
+
+    const misses = priorRecords.filter(
+      (record) =>
+        record.date < date &&
+        (record.absentWithoutApology || []).includes(name),
+    ).length;
+    const amount =
+      misses >= 2 ? Number(cfg.fineThreeMisses) : Number(cfg.fineMeeting);
+    const fine = addFine({
+      memberId,
+      type: "meeting",
+      label,
+      amount,
+      date,
+      meetingId,
+      minutesId,
+    });
+    fines.push(fine);
+    created += 1;
+  });
+  return created;
+}
+
+function syncMinutesFines(minutes) {
+  return syncAttendanceFines({
+    date: minutes.meetingDate,
+    absentWithoutApology: minutes.absentWithoutApology,
+    priorRecords: read(KEYS.minutes, [])
+      .filter(
+        (item) =>
+          item.id !== minutes.id && item.meetingDate < minutes.meetingDate,
+      )
+      .map((item) => ({
+        date: item.meetingDate,
+        absentWithoutApology: item.absentWithoutApology,
+      })),
+    minutesId: minutes.id,
+  });
+}
+
 export function addMinutes(data) {
   const list = read(KEYS.minutes, []);
   const now = new Date().toISOString();
@@ -430,22 +579,150 @@ export function addMinutes(data) {
   };
   list.push(next);
   write(KEYS.minutes, list);
+  syncMinutesFines(next);
   return next;
 }
 
 export function updateMinutes(id, updates) {
+  const list = read(KEYS.minutes, []);
+  const current = list.find((m) => m.id === id);
+  if (!current) return null;
+  const next = { ...current, ...updates, updatedAt: new Date().toISOString() };
   write(
     KEYS.minutes,
-    read(KEYS.minutes, []).map((m) =>
-      m.id === id
-        ? { ...m, ...updates, updatedAt: new Date().toISOString() }
-        : m,
-    ),
+    list.map((m) => (m.id === id ? next : m)),
   );
+
+  if (
+    ["meetingDate", "membersPresent", "absentWithApology", "absentWithoutApology"].some(
+      (key) => Object.prototype.hasOwnProperty.call(updates, key),
+    )
+  ) {
+    syncMinutesFines(next);
+  }
+  return next;
 }
 
 export function deleteMinutes(id) {
+  write(
+    KEYS.fines,
+    read(KEYS.fines, []).filter(
+      (fine) => !(fine.type === "meeting" && fine.minutesId === id && fine.status === "unpaid"),
+    ),
+  );
   write(KEYS.minutes, read(KEYS.minutes, []).filter((m) => m.id !== id));
+}
+
+export function applyMinutesImport(draft) {
+  const {
+    minutesId = null,
+    matchMeetingId = null,
+    linkMeeting = true,
+    actionItems = [],
+    status = "draft",
+  } = draft;
+  const members = getMembers().filter((m) => m.role === "member");
+  const aliases = getMemberNameAliases();
+  const canonical = (name) => {
+    const value = String(name || "").trim();
+    if (!value) return "";
+    const alias = Object.keys(aliases).find((k) => normalizeName(k) === normalizeName(value));
+    if (alias) {
+      const aliased = members.find((m) => normalizeName(m.name) === normalizeName(aliases[alias]));
+      if (aliased) return aliased.name;
+    }
+    const hit = members.find((m) => normalizeName(m.name) === normalizeName(value));
+    return hit ? hit.name : value;
+  };
+  const list = (arr) => (arr || []).map(canonical).filter(Boolean);
+
+  const data = {
+    title: draft.title,
+    meetingType: draft.meetingType,
+    meetingDate: draft.meetingDate,
+    startTime: draft.startTime,
+    endTime: draft.endTime,
+    venue: draft.venue,
+    chairperson: draft.chairperson,
+    viceChairperson: draft.viceChairperson,
+    treasurer: draft.treasurer,
+    secretary: draft.secretary,
+    organizingSecretary: draft.organizingSecretary,
+    nominatedMember: draft.nominatedMember,
+    membersPresent: list(draft.membersPresent),
+    absentWithApology: list(draft.absentWithApology),
+    absentWithoutApology: list(draft.absentWithoutApology),
+    agenda: (draft.agenda || []).filter(Boolean),
+    resolutions: (draft.resolutions || []).filter((r) => r.title && r.body),
+    writtenBy: draft.writtenBy,
+    approvedBy: draft.approvedBy,
+    sourceDocument: draft.sourceDocument || "",
+    status,
+  };
+
+  const minutes = minutesId ? updateMinutes(minutesId, data) : addMinutes(data);
+  if (!minutes) throw new Error("Those minutes no longer exist.");
+
+  let meetingId = matchMeetingId && matchMeetingId !== "new" ? matchMeetingId : null;
+  let meetingCreated = false;
+  if (linkMeeting && !meetingId) {
+    const created = addMeeting({
+      title: data.title,
+      date: data.meetingDate,
+      time: data.startTime,
+      venue: data.venue,
+      agenda: data.agenda,
+      minutesId: minutes.id,
+      president: data.chairperson,
+      secretary: data.secretary,
+      attendance: null,
+    });
+    meetingId = created.id;
+    meetingCreated = true;
+  }
+
+  let finesCreated = 0;
+  if (meetingId) {
+    updateMeeting(meetingId, {
+      title: data.title,
+      date: data.meetingDate,
+      time: data.startTime,
+      venue: data.venue,
+      agenda: data.agenda,
+      minutesId: minutes.id,
+      president: data.chairperson,
+      secretary: data.secretary,
+      attendance: {
+        membersPresent: data.membersPresent,
+        absentWithApology: data.absentWithApology,
+        absentWithoutApology: data.absentWithoutApology,
+      },
+    });
+    finesCreated = finesFromAttendance(meetingId);
+  }
+
+  const usedKeys = new Set(
+    getActionItems()
+      .filter((a) => a.minutesId === minutes.id)
+      .map((a) => `${normalizeName(a.ref)}|${normalizeName(a.title)}`),
+  );
+  let actionItemsCreated = 0;
+  (actionItems || []).forEach((item) => {
+    if (!item || item.include === false || !item.title?.trim()) return;
+    const key = `${normalizeName(item.ref)}|${normalizeName(item.title)}`;
+    if (usedKeys.has(key)) return;
+    addActionItem({
+      minutesId: minutes.id,
+      ref: item.ref || "",
+      title: item.title.trim(),
+      owner: item.owner || "",
+      dueDate: item.dueDate || "",
+    });
+    usedKeys.add(key);
+    actionItemsCreated += 1;
+  });
+
+  return { minutes, meetingId, meetingCreated, finesCreated, actionItemsCreated };
 }
 
 export function getSavingsRecord() {
@@ -967,6 +1244,7 @@ export function getWithdrawals() {
 }
 
 export function addOfficialTransaction({
+  type = "withdrawal",
   title,
   amount,
   date,
@@ -976,13 +1254,14 @@ export function addOfficialTransaction({
   evidenceName,
   evidenceDataUrl,
   recordedBy = "Treasurer",
-  requiredApprovers = ["chairperson", "vicechairperson", "treasurer"],
 }) {
   const value = Math.abs(Number(amount));
   if (!title || !value) throw new Error("Transaction title and amount are required");
+  const transactionType = type === "deposit" ? "deposit" : "withdrawal";
 
   const txn = {
     id: `txn-${Date.now()}`,
+    type: transactionType,
     title: String(title).trim(),
     amount: value,
     date: date || today(),
@@ -992,13 +1271,6 @@ export function addOfficialTransaction({
     evidenceName: evidenceName || "",
     evidenceDataUrl: evidenceDataUrl || "",
     recordedBy,
-    requiredApprovers,
-    approvals: {
-      chairperson: false,
-      vicechairperson: false,
-      treasurer: false,
-    },
-    status: "pending",
     createdAt: new Date().toISOString(),
   };
 
@@ -1007,8 +1279,8 @@ export function addOfficialTransaction({
   write(KEYS.transactions, list);
 
   recordTreasuryAudit({
-    type: "withdrawal",
-    title: `Transaction logged · ${txn.title}`,
+    type: transactionType,
+    title: `${transactionType === "deposit" ? "Deposit" : "Withdrawal"} logged · ${txn.title}`,
     detail: `Recorded by ${recordedBy} for ${txn.reason || "general operations"}`,
     amount: value,
     account: "official",
@@ -1020,53 +1292,6 @@ export function addOfficialTransaction({
   });
 
   return txn;
-}
-
-export function approveOfficialTransaction(transactionId, roleKey, approvedByName, actorRole) {
-  const list = read(KEYS.transactions, []);
-  const txn = list.find((item) => item.id === transactionId);
-  if (!txn) throw new Error("Transaction not found");
-
-  const role = String(roleKey || "").trim();
-  if (!role || !txn.requiredApprovers.includes(role)) {
-    throw new Error("This official role is not required to approve this transaction");
-  }
-
-  const actor = String(actorRole || "").trim();
-  if (actor && actor !== role) {
-    throw new Error(`Only the ${role} role can approve this transaction.`);
-  }
-
-  const approver = String(approvedByName || "").trim();
-  if (!approver) {
-    throw new Error("Approver name is required");
-  }
-
-  txn.approvals = { ...txn.approvals, [role]: true };
-  txn.approvedBy = {
-    ...(txn.approvedBy || {}),
-    [role]: approver,
-  };
-
-  const allApproved = txn.requiredApprovers.every((r) => txn.approvals[r]);
-  txn.status = allApproved ? "approved" : "pending";
-
-  recordTreasuryAudit({
-    type: "approval",
-    title: `Approval recorded · ${txn.title}`,
-    detail: `${approver} approved as ${role}. Status: ${txn.status}`,
-    amount: txn.amount,
-    account: "official",
-    role,
-    date: today(),
-  });
-
-  write(KEYS.transactions, list);
-  return txn;
-}
-
-export function getPendingOfficialTransactions() {
-  return getWithdrawals().filter((txn) => txn.status !== "approved");
 }
 
 export function addWithdrawal({ memberId, amount, reason }) {
@@ -1135,17 +1360,18 @@ export function getMemberFines(memberId) {
   return getFinesLog().filter((f) => f.memberId === memberId);
 }
 
-export function addFine({ memberId, type, label, amount, date, meetingId }) {
+export function addFine({ memberId, type, label, amount, date, meetingId, minutesId }) {
   if (!memberId || !Number(amount)) throw new Error("Member and amount required");
   const list = read(KEYS.fines, []);
   const next = {
-    id: `fine-${Date.now()}`,
+    id: `fine-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     memberId,
     type: type || "other",
     label: label || "Fine",
     amount: Number(amount),
     date: date || today(),
     meetingId: meetingId || null,
+    minutesId: minutesId || null,
     status: "unpaid",
   };
   list.push(next);
@@ -1329,45 +1555,26 @@ export function saveMeetingAttendance(meetingId, { presentIds, apologyIds, absen
       absentWithoutApology: build(absentIds),
     },
   });
+  return finesFromAttendance(meetingId);
 }
 
 export function finesFromAttendance(meetingId) {
-  const meeting = getMeetings().find((m) => m.id === meetingId);
+  const meetings = getMeetings();
+  const meeting = meetings.find((m) => m.id === meetingId);
   if (!meeting || !meeting.attendance) {
     throw new Error("No attendance recorded for this meeting yet");
   }
-  const cfg = getConfig();
-  const before = getMeetings().filter(
-    (m) => m.date < meeting.date && m.attendance,
-  );
-  const absent = meeting.attendance.absentWithoutApology || [];
-  const namesById = Object.fromEntries(
-    getMembers()
-      .filter((m) => m.role === "member")
-      .map((m) => [m.id, m.name]),
-  );
-  let created = 0;
-  absent.forEach((name) => {
-    const memberId = Object.keys(namesById).find(
-      (id) => namesById[id] === name,
-    );
-    if (!memberId) return;
-    const misses = before.filter((m) =>
-      (m.attendance.absentWithoutApology || []).includes(name),
-    ).length;
-    const amount =
-      misses >= 2 ? Number(cfg.fineThreeMisses) : Number(cfg.fineMeeting);
-    addFine({
-      memberId,
-      type: "meeting",
-      label: `Missed meeting fine — ${meeting.date} (${name})`,
-      amount,
-      date: meeting.date,
-      meetingId,
-    });
-    created += 1;
+  return syncAttendanceFines({
+    date: meeting.date,
+    absentWithoutApology: meeting.attendance.absentWithoutApology,
+    priorRecords: meetings
+      .filter((m) => m.id !== meeting.id && m.date < meeting.date && m.attendance)
+      .map((m) => ({
+        date: m.date,
+        absentWithoutApology: m.attendance.absentWithoutApology,
+      })),
+    meetingId,
   });
-  return created;
 }
 
 // ---------- Action items ----------

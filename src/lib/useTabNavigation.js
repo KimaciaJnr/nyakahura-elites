@@ -12,6 +12,8 @@ export default function useTabNavigation(defaultTab = "overview", options = {}) 
   const tabRef = useRef(tab);
   tabRef.current = tab;
 
+  const skipPopRef = useRef(false);
+
   function goTab(next) {
     if (next === tabRef.current) return;
     const params = new URLSearchParams(location.search);

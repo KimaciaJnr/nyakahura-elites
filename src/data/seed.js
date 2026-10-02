@@ -104,6 +104,32 @@ export const MEMBER_CONTACTS_BY_NO = {
   "NE-021": { name: "Peter Muchoki", phone: "0702144569", email: "peterndabi17@gmail.com" },
 };
 
+// Names that appear in older minutes, the paper savings record or contact
+// sheets but belong to a member whose recorded name differs. Key = the
+// spelling used in those documents, value = the member's recorded name.
+export const MEMBER_NAME_ALIASES = {
+  "David Muhia": "David Mugo",
+  "David Muhia Mugo": "David Mugo",
+  "Vincent Ng'ang'a": "Vincent Nganga",
+  "Nelius Waithira": "Nelius Waithera",
+  "John Macharia": "John Maina",
+  "Philip Gatimu": "Phillip Gatimu",
+  "Stanely Ndiba": "Stanley Ndiba",
+};
+
+const normaliseNameKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+// Every document spelling that resolves to a given recorded member name.
+export function documentSpellings(recordedName) {
+  const key = normaliseNameKey(recordedName);
+  return Object.keys(MEMBER_NAME_ALIASES).filter(
+    (alias) => normaliseNameKey(MEMBER_NAME_ALIASES[alias]) === key,
+  );
+}
+
 const MEMBERS = NAMES.map((name, i) => {
   const id = `m${i + 1}`;
   const memberNo = `NE-${String(i + 1).padStart(3, "0")}`;
@@ -233,38 +259,7 @@ function buildHistory(member) {
   return { balance, entries, fees };
 }
 
-const INVESTMENTS = [
-  {
-    id: "inv-1",
-    title: "Community Plot — Nyakahura",
-    category: "land",
-    amount: 1250000,
-    currentValue: 1600000,
-    date: "2023-03",
-    status: "active",
-    notes: "Half-acre parcel reserved for community projects and future member amenities.",
-  },
-  {
-    id: "inv-2",
-    title: "Maize Trading Fund",
-    category: "business",
-    amount: 450000,
-    currentValue: 512000,
-    date: "2024-10",
-    status: "active",
-    notes: "Seasonal maize buying and resale run by a small committee from the group.",
-  },
-  {
-    id: "inv-3",
-    title: "Member Welfare Loan Fund",
-    category: "loan",
-    amount: 300000,
-    currentValue: 300000,
-    date: "2025-06",
-    status: "active",
-    notes: "Revolving fund for member emergencies, repaid with agreed interest.",
-  },
-];
+const INVESTMENTS = [];
 
 export { ADMIN, MEMBERS, INVESTMENTS, DEFAULT_CONTRIBUTION };
 
@@ -651,7 +646,7 @@ export const SEED_BANK_ACCOUNTS = [
     txns: [
       { date: "2026-06-01", amount: 12000, note: "June contributions" },
       { date: "2026-07-01", amount: 11800, note: "July contributions" },
-      { date: "2026-07-05", amount: -50000, note: "Transfer to KCB Money Market Fund" },
+      { date: "2026-07-05", amount: -300000, note: "Transfer to KCB Money Market Fund" },
     ],
   },
 ];
@@ -659,12 +654,12 @@ export const SEED_BANK_ACCOUNTS = [
 export const SEED_MMF = {
   id: "mmf-kcb",
   name: "KCB Money Market Fund",
-  balance: 50000,
+  balance: 300000,
   unitPrice: 118.4,
-  shares: 422.3,
+  shares: 2533.78,
   updatedAt: "2026-09-20",
   txns: [
-    { date: "2026-07-05", amount: 50000, note: "Initial investment (per MIN.07/AGM/2025)" },
+    { date: "2026-07-05", amount: 300000, note: "Cash deposited into KCB Money Market Fund" },
   ],
 };
 
@@ -931,13 +926,8 @@ export function buildSeed() {
 
   for (let i = 0; i < members.length; i++) {
     const member = members[i];
-    const row = SAVINGS_RECORD_ROWS.find((r) =>
-      r.name === member.name ||
-      (member.memberNo === "NE-002" && r.name === "David Muhia") ||
-      (member.memberNo === "NE-004" && r.name === "Vincent Ng'ang'a") ||
-      (member.memberNo === "NE-013" && r.name === "Nelius Waithira") ||
-      (member.memberNo === "NE-017" && r.name === "John Macharia"),
-    ) || null;
+    const names = [member.name, ...documentSpellings(member.name)];
+    const row = SAVINGS_RECORD_ROWS.find((r) => names.includes(r.name)) || null;
     if (!row) continue;
 
     const account = accounts.find((a) => a.memberId === member.id);

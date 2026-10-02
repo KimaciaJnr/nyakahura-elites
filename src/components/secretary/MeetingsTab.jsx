@@ -7,7 +7,6 @@ import {
   Plus,
   X,
   Save,
-  AlertOctagon,
   CalendarClock,
 } from "lucide-react";
 import {
@@ -17,7 +16,6 @@ import {
   updateMeeting,
   deleteMeeting,
   saveMeetingAttendance,
-  finesFromAttendance,
   getMinutes,
 } from "../../lib/store";
 
@@ -168,12 +166,11 @@ function AttendanceRegister({ meeting, onClose, onChanged }) {
       if (initial?.membersPresent?.includes(m.name)) map[m.id] = "present";
       else if (initial?.absentWithApology?.includes(m.name)) map[m.id] = "apology";
       else if (initial?.absentWithoutApology?.includes(m.name)) map[m.id] = "absent";
-      else map[m.id] = "absent";
+      else map[m.id] = "";
     });
     return map;
   });
   const [msg, setMsg] = useState("");
-  const [finesMsg, setFinesMsg] = useState("");
 
   const setStatus = (id, status) => setState((s) => ({ ...s, [id]: status }));
 
@@ -247,12 +244,20 @@ function AttendanceRegister({ meeting, onClose, onChanged }) {
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button
             onClick={() => {
-              saveMeetingAttendance(meeting.id, {
+              if (members.some((m) => !state[m.id])) {
+                setMsg("Mark every member as present, apology, or absent before saving.");
+                return;
+              }
+              const created = saveMeetingAttendance(meeting.id, {
                 presentIds: present.map((n) => byName[n]),
                 apologyIds: apology.map((n) => byName[n]),
                 absentIds: absent.map((n) => byName[n]),
               });
-              setMsg("Attendance saved.");
+              setMsg(
+                created
+                  ? `Attendance saved. ${created} fine(s) applied automatically.`
+                  : "Attendance saved. No new fines were needed.",
+              );
               onChanged();
             }}
             className="inline-flex items-center gap-2 rounded-full bg-green px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-dark"
@@ -260,29 +265,8 @@ function AttendanceRegister({ meeting, onClose, onChanged }) {
             <Save className="h-4 w-4" />
             Save attendance
           </button>
-          <button
-            onClick={() => {
-              if (!meeting.attendance) {
-                setFinesMsg("Save attendance first.");
-                return;
-              }
-              if (absent.length === 0) {
-                setFinesMsg("No members marked absent — no fines to generate.");
-                return;
-              }
-              if (!window.confirm(`Generate fines for ${absent.length} absent member(s)?`)) return;
-              const created = finesFromAttendance(meeting.id);
-              setFinesMsg(`${created} fine(s) created in the fines register.`);
-              onChanged();
-            }}
-            className="inline-flex items-center gap-2 rounded-full bg-gold-dark px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-gold"
-          >
-            <AlertOctagon className="h-4 w-4" />
-            Generate fines from absences
-          </button>
         </div>
         {msg && <p className="mt-3 text-xs font-medium text-green">{msg}</p>}
-        {finesMsg && <p className="mt-3 text-xs font-medium text-navy/60">{finesMsg}</p>}
       </div>
     </div>
   );
@@ -433,8 +417,7 @@ export default function MeetingsTab({ onChanged }) {
 
       <p className="flex items-center gap-2 text-xs text-white/50">
         <CalendarClock className="h-4 w-4" />
-        Fines generated from absences appear instantly in the Treasurer's "Fines
-        & loans" tab.
+        Fines from absences without apology are applied automatically when attendance is saved.
       </p>
     </div>
   );

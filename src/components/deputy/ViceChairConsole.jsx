@@ -63,6 +63,7 @@ export default function ViceChairConsole({ session, onLogout }) {
               onLogout={onLogout}
               onTabBack={tabBack}
               signOutAtRoot
+              className="inline-flex items-center gap-2 rounded-full bg-navy/5 px-3.5 py-2 text-sm font-semibold text-navy transition-colors hover:bg-navy/10"
             >
               Back
             </BackToLogin>

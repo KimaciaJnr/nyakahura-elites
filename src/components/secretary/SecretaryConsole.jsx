@@ -16,6 +16,7 @@ import {
   Megaphone,
   BookUser,
   LayoutDashboard,
+  Upload,
 } from "lucide-react";
 import {
   getMinutes,
@@ -28,6 +29,7 @@ import ThemeToggle from "../ThemeToggle";
 import RoleMandate from "../RoleMandate";
 import useTabNavigation from "../../lib/useTabNavigation";
 import MinutesForm from "./MinutesForm";
+import MinutesImport from "./MinutesImport";
 import MeetingsTab from "./MeetingsTab";
 import ActionItemsTab from "./ActionItemsTab";
 import AnnouncementsTab from "./AnnouncementsTab";
@@ -175,6 +177,14 @@ export default function SecretaryConsole({ session, onLogout }) {
                 onCancel={() => setView({ name: "list" })}
                 onSaved={(savedId) => setView({ name: "detail", id: savedId })}
               />
+            ) : view.name === "import" ? (
+              <MinutesImport
+                onCancel={() => setView({ name: "list" })}
+                onImported={(savedId) => {
+                  setRefresh((n) => n + 1);
+                  setView({ name: "detail", id: savedId });
+                }}
+              />
             ) : view.name === "detail" ? (
               <MinutesDetail
                 id={view.id}
@@ -187,6 +197,7 @@ export default function SecretaryConsole({ session, onLogout }) {
                 minutes={minutes}
                 approvedCount={approvedCount}
                 onWrite={() => setView({ name: "form", minutes: null })}
+                onImport={() => setView({ name: "import" })}
                 onRead={(id) => setView({ name: "detail", id })}
                 onEdit={(m) => setView({ name: "form", minutes: m })}
                 onDelete={(id) => {
@@ -202,7 +213,7 @@ export default function SecretaryConsole({ session, onLogout }) {
   );
 }
 
-function MinutesList({ minutes, approvedCount, onWrite, onRead, onEdit, onDelete }) {
+function MinutesList({ minutes, approvedCount, onWrite, onImport, onRead, onEdit, onDelete }) {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -237,18 +248,28 @@ function MinutesList({ minutes, approvedCount, onWrite, onRead, onEdit, onDelete
               Record submissions after every meeting for easy tracking.
             </p>
           </div>
-          <button
-            onClick={onWrite}
-            className="inline-flex items-center gap-1.5 rounded-full bg-gold-dark px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gold"
-          >
-            <PenLine className="h-4 w-4" />
-            Write minutes
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={onImport}
+              className="inline-flex items-center gap-1.5 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-light"
+            >
+              <Upload className="h-4 w-4" />
+              Import document
+            </button>
+            <button
+              onClick={onWrite}
+              className="inline-flex items-center gap-1.5 rounded-full bg-gold-dark px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gold"
+            >
+              <PenLine className="h-4 w-4" />
+              Write minutes
+            </button>
+          </div>
         </div>
 
         {minutes.length === 0 ? (
           <p className="mt-6 rounded-2xl bg-sand px-5 py-8 text-center text-sm text-navy/50">
-            No meetings recorded yet. Click "Write minutes" to add the first one.
+            No meetings recorded yet. Import an existing .docx/.pdf document or write the first
+            minutes yourself.
           </p>
         ) : (
           <ul className="mt-5 space-y-3">
